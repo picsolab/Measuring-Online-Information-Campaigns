@@ -23,9 +23,9 @@ import networkx as nx
 import math
 import graph_ops
 from scipy.stats import pearsonr, spearmanr, ttest_ind, mannwhitneyu, kruskal, ks_2samp
-from src.language.text_parser import EkphrasisParser
 from empath import Empath
-from src.language import liwc
+#from src.language.text_parser import EkphrasisParser
+#from src.language import liwc
 
 mapping = {
     "abo": {"left": 0.53784, "right": 0.74940},
@@ -33,22 +33,36 @@ mapping = {
     "blm": {"left": 0.52373, "right": 0.69474}
 }
 
-
 class Tweet:
     def __init__(self, util):
+        
         self.util = util
-        self.tweets_path = 'data/from_anu/v1/{}_all_tweets_from_filtered_videos.pkl'.format(self.util.campaign)
-        self.available_tweets_path = 'data/from_anu/v1/{}_{}_available_tweets.pkl'.format(self.util.campaign, self.util.ea_type)
-        self.users_path = 'data/from_anu/v1/{}_all_users_from_filtered_videos.pkl'.format(self.util.campaign)
-        self.available_users_ids_path = 'data/from_anu/v1/{}_{}_available_users_ids.pkl'.format(self.util.campaign, 
-                                                                                                self.util.ea_type)
-        #self.users_suspended_path = 'data/from_anu/{}_users_suspended_or_not.pkl'.format(self.util.campaign)
-        self.users_followers_path = 'twitter_data_collection/data/{}_{}/followers_{}.pkl'.format(self.util.campaign, 
-                                                                                                 self.util.ea_type, 
-                                                                                                 str(self.util.year))
-        self.users_sub_followings_path = 'twitter_data_collection/data/{}_{}/sub_followings_{}.pkl'.format(self.util.campaign,
-                                                                                                           self.util.ea_type, 
-                                                                                                           str(self.util.year))
+        
+        ## All relevant tweets, users, videos by relevant videos
+        self.tweets_path = 'data/social_media/{}/all_tweets_by_relevant_videos.pkl'.format(self.util.campaign)
+        self.users_path = 'data/social_media/{}/all_users_by_relevant_videos.pkl'.format(self.util.campaign)
+        self.videos_path = 'data/social_media/{}/all_videos_by_relevant_videos.pkl'.format(self.util.campaign)
+        
+        ## Early adopters' status about available, banned or protected. (Early adopters are not clean yet.)
+        self.ea_users_suspended_path = 'data/social_media/{}/ea_users_suspended_or_not.pkl'.format(self.util.campaign)
+       
+        ## Clean (i.e. available) early adopters' tweets, user_ids, followers, locations, leaning labels and inferred scores.
+        self.ea_tweets_path = 'data/social_media/{}/ea_tweets.pkl'.format(self.util.campaign)
+        self.ea_users_ids_path = 'data/social_media/{}/ea_users_ids.pkl'.format(self.util.campaign)
+        self.ea_users_followers_path = 'data/social_media/{}/ea_followers_{}.pkl'.format(self.util.campaign, str(self.util.year))
+        self.ea_users_locs_path = 'data/social_media/{}/ea_users_locs.pkl'.format(self.util.campaign)
+        self.ea_users_sub_followings_path = 'data/social_media/{}/ea_users_sub_followings_{}.pkl'.format(self.util.campaign,
+                                                                                                   str(self.util.year))
+        
+        
+        self.left_seed_political_hashtags_path = 'data/leaning_keywords/left_political.txt'
+        self.right_seed_political_hashtags_path = 'data/leaning_keywords/right_political.txt'
+        self.left_extended_political_hashtags_path = 'data/social_media/{}/left_political_hashtags_extended.txt'.format(self.campaign)
+        self.right_extended_political_hashtags_path = 'data/social_media/{}/right_political_hashtags_extended.txt'.format(self.campaign)
+        self.ea_users_leanings_labels_path = 'data/social_media/{}/ea_users_leanings_labels.pkl'.format(self.util.campaign)
+        self.ea_users_inferred_leanings_scores_path = 'data/social_media/{}/ea_users_inferred_leanings_scores.pkl'.format(self.util.campaign)
+        
+        
         self.video_tweet_cascades_path = 'data/from_anu/v1/{}_{}_video_tweet_cascades_basic.pkl'.format(self.util.campaign, 
                                                                                                   self.util.ea_type)
         self.video_tweet_structural_measures_potential_path = "data/from_anu/v1/{}_{}_video_tweet_structural_measures_potential.pkl".format(self.util.campaign, self.util.ea_type)
@@ -62,15 +76,7 @@ class Tweet:
         
         self.video_tweet_engagement_measures_path = "data/from_anu/v1/{}_{}_video_tweet_engagement_measures.pkl".format(self.util.campaign, self.util.ea_type)
         
-        self.users_locs_path = 'data/from_anu/v1/{}_{}_users_locs.pkl'.format(self.util.campaign, self.util.ea_type)
-        self.users_leanings_labels_path = 'data/from_anu/v1/{}_{}_users_leanings_labels.pkl'.format(self.util.campaign, 
-                                                                                                    self.util.ea_type)
-        self.users_inferred_leanings_scores_path = 'data/from_anu/v1/{}_{}_users_inferred_leanings_scores.pkl'.format(self.util.campaign, self.util.ea_type)
-        self.users_communities_path = 'results/{}_{}/{}/{}/communities_{}_res_1.pkl'.format(self.util.campaign, 
-                                                                                              self.util.ea_type, 
-                                                                                              self.util.method_type, 
-                                                                                              self.util.filter_type, 
-                                                                                              str(self.util.year))
+        
         
         self.predefined_video_leaning_thr = mapping[self.util.campaign]
         
@@ -267,22 +273,14 @@ class Tweet:
     
     ## Return available tweets, create available tweet subset from all explicit tweets if it does not exist.
     def getAvailableTweets(self, ea_ratio):
-        if os.path.isfile(self.available_tweets_path):
-            available_tweets = pickle.load(open(self.available_tweets_path, 'rb'))
-            return available_tweets
+        if os.path.isfile(self.ea_tweets_path):
+            available_ea_tweets = pickle.load(open(self.ea_tweets_path, 'rb'))
+            return available_ea_tweets
         else:
             tweets = pickle.load(open(self.tweets_path, 'rb'))
-            followers = pickle.load(open(self.users_followers_path, 'rb'))
-            filtered_video_ids = []
-            with open('data/from_anu/v1/{}_video_annotations.csv'.format(self.util.campaign)) as csv_file:
-                csv_reader = csv.reader(csv_file, delimiter=',')
-                line_count = 0
-                for row in csv_reader:
-                    video_id = row[0]
-                    label = row[3]
-                    if label == '1':
-                        filtered_video_ids.append(video_id)
-                    line_count += 1
+            followers = pickle.load(open(self.ea_users_followers_path, 'rb'))
+            filtered_video_ids = pickle.load(open(self.videos_path), 'rb')
+            filtered_video_ids = list(filtered_video_ids.keys())
             
             video_early_adopters = self.findEarlyAdopters(ea_ratio, tweets, filtered_video_ids)
             all_ea_tweet_ids = []
@@ -297,25 +295,25 @@ class Tweet:
             print('all_ea_tweet_ids:', len(all_ea_tweet_ids))
             print('all_ea_tweet_ids:', len(set(all_ea_tweet_ids)))
             
-            available_tweets = {}
+            available_ea_tweets = {}
             for tid in all_ea_tweet_ids:
                 uid = tweets[tid]['_source']['user_id_str']
                 if uid in followers:
-                    available_tweets[tid] = copy.deepcopy(tweets[tid])
+                    available_ea_tweets[tid] = copy.deepcopy(tweets[tid])
             
-            available_user_ids = {}
-            for tid in available_tweets:
-                uid = available_tweets[tid]['_source']['user_id_str']
-                available_user_ids[uid] = 0
+            available_ea_user_ids = {}
+            for tid in available_ea_tweets:
+                uid = available_ea_tweets[tid]['_source']['user_id_str']
+                available_ea_user_ids[uid] = 0
         
-            pickle.dump(available_tweets, open(self.available_tweets_path, 'wb'))
-            pickle.dump(available_user_ids, open(self.available_users_ids_path, 'wb'))
+            pickle.dump(available_ea_tweets, open(self.ea_tweets_path, 'wb'))
+            pickle.dump(available_ea_user_ids, open(self.ea_users_ids_path, 'wb'))
             return available_tweets
     
     
     ## Summarize users and tweets by suspended, protected and available.
     def summarizeUsersTweetsInfo(self, tweets):
-        followers = pickle.load(open(self.users_followers_path, 'rb'))
+        followers = pickle.load(open(self.ea_users_followers_path, 'rb'))
         
         num_avaiable_users = len(list(followers.keys()))
         print('# total available tweets:', len(tweets.keys()))
@@ -350,7 +348,7 @@ class Tweet:
     
     ## Summarize number of users w.r.t their number of followers.
     def summarizeFollowers(self):
-        followers = pickle.load(open(self.users_followers_path, 'rb'))
+        followers = pickle.load(open(self.ea_users_followers_path, 'rb'))
         
         follower_counts = np.array([len(item) for item in followers.values()])
         users = {}
@@ -440,32 +438,6 @@ class Tweet:
     ###########################################################################
     ## USER Profile Enhancement operations ####################################
     ###########################################################################
-    ## deneme for user locations from tweets
-    def denemeTweetLocations(self, tweets):
-        total = 0
-        users = {}
-        user_info = pickle.load(open(self.users_path, 'rb'))
-        for tweet_id in tweets:
-            user_id = tweets[tweet_id]['_source']['user_id_str']
-            tweet_cc = tweets[tweet_id]['_source']['original_countrycode'].strip()
-            tweet_geoname = tweets[tweet_id]['_source']['original_geoname'].strip()
-            user_loc = user_info[user_id]['_source']['location'].strip()
-            est_user_loc = location.findLocation(user_loc)
-            tweet_loc = location.findLocationFromTweet(tweet_geoname, tweet_cc, est_user_loc, user_loc)
-            if tweet_loc != None:
-                if user_id in users:
-                    if tweet_loc in users[user_id]:
-                        users[user_id][tweet_loc] += 1
-                    else:
-                        users[user_id][tweet_loc] = 1
-                else:
-                    users[user_id] = {}
-                    users[user_id][tweet_loc] = 1
-                    
-                total+=1
-        print("total:", total)
-        print(users)
-    
     ## Find and assign location of the users from tweets and profiles.
     def assignUserLocations(self, tweets):
         users = pickle.load(open(self.users_path, 'rb'))
@@ -523,19 +495,15 @@ class Tweet:
                     est_loc = est_tweet_loc
                 else:
                     est_loc = est_user_loc
-                '''
-                elif est_user_loc in location.getStates() and est_tweet_loc != 'United States':
-                    est_loc = est_tweet_loc
-                '''
             
             users_locs[user_id] = est_loc
         
-        pickle.dump(users_locs, open(self.users_locs_path, 'wb'))
+        pickle.dump(users_locs, open(self.ea_users_locs_path, 'wb'))
     
     ## Find all hashtags in user profiles
     def getAllHashtags(self):
         users = pickle.load(open(self.users_path, 'rb'))
-        available_users_ids = pickle.load(open(self.available_users_ids_path, 'rb'))
+        available_users_ids = pickle.load(open(self.ea_users_ids_path, 'rb'))
         hashtags = {}
         for user_id in users:
             if user_id in available_users_ids:
@@ -553,14 +521,14 @@ class Tweet:
     
     ## Find the hastag co-occurence matrix and entropy w.r.t the left political and right political hashtags.
     def findHashtagCooccurrences(self):
-        available_users_ids = pickle.load(open(self.available_users_ids_path, 'rb'))
+        available_users_ids = pickle.load(open(self.ea_users_ids_path, 'rb'))
         users = pickle.load(open(self.users_path, 'rb'))
         
         all_hashtags = self.getAllHashtags()
         hashtags = [ht[0] for ht in all_hashtags if ht[1] > 3]
         
         left_political_hts = []
-        with open('data/leaning_keywords/left_political.txt', 'r') as f:
+        with open(self.left_seed_political_hashtags_path, 'r') as f:
             inp = f.readlines()
             left_political_hts = [kw.rstrip() for kw in inp]
         
@@ -569,7 +537,7 @@ class Tweet:
                 hashtags.remove(ht)
         
         right_political_hts = []
-        with open('data/leaning_keywords/right_political.txt', 'r') as f:
+        with open(self.right_seed_political_hashtags_path, 'r') as f:
             inp = f.readlines()
             right_political_hts = [ht.rstrip() for ht in inp]
         
@@ -615,18 +583,17 @@ class Tweet:
     
     ## Assign the political leanings (left vs. right) to users as seed users.
     def assignUserLeaningLabels(self):
-        available_users_ids = pickle.load(open(self.available_users_ids_path, 'rb'))
+        available_users_ids = pickle.load(open(self.ea_users_ids_path, 'rb'))
         users = pickle.load(open(self.users_path, 'rb'))
-        
         print(len(users.keys()))
         
         left_hts = []
-        with open('data/from_anu/v1/{}_{}_left_political_extended.txt'.format(self.util.campaign, self.util.ea_type), 'r') as f:
+        with open(self.left_extended_political_hashtags_path, 'r') as f:
             inp = f.readlines()
             left_hts = [ht.rstrip() for ht in inp]
         
         right_hts = []
-        with open('data/from_anu/v1/{}_{}_right_political_extended.txt'.format(self.util.campaign, self.util.ea_type), 'r') as f:
+        with open(self.right_extended_political_hashtags_path, 'r') as f:
             inp = f.readlines()
             right_hts = [ht.rstrip() for ht in inp]
         
@@ -654,8 +621,7 @@ class Tweet:
 
                 user_leanings[user_id] = leaning
         
-        pickle.dump(user_leanings, open('data/from_anu/v1/{}_{}_users_leanings_labels.pkl'.format(self.util.campaign, 
-                                                                                               self.util.ea_type), 'wb'))
+        pickle.dump(user_leanings, open(self.ea_users_leanings_labels_path, 'wb'))
         return user_leanings
    
     
@@ -702,7 +668,7 @@ class Tweet:
     
     ## Assign the political leanings (left vs. right) to videos from users that promote them.
     def assignVideoLeaningLabels(self, tweets):
-        users_inferred_leanings_scores = pickle.load(open(self.users_inferred_leanings_scores_path, 'rb'))
+        users_inferred_leanings_scores = pickle.load(open(self.ea_users_inferred_leanings_scores_path, 'rb'))
         filtered_video_ids = self.getFilteredVideoIds()
         #filtered_videos = self.filterVideos(tweets, min_occ_in_available_users, context_relevant_tweet_ratio)
         counter = 0
@@ -782,10 +748,10 @@ class Tweet:
     ## Create the sub-following dict to make the calculation of tweet-cascade for a video computational-efficient.
     ## Run only once.
     def createSubFollowingsDictForCascade(self):
-        if os.path.isfile(self.users_sub_followings_path):
-            print("sub_following_list already exists!! {}".format(self.users_sub_followings_path))
+        if os.path.isfile(self.ea_users_sub_followings_path):
+            print("sub_following_list already exists!! {}".format(self.ea_users_sub_followings_path))
         else:
-            followers = pickle.load(open(self.users_followers_path, 'rb'))
+            followers = pickle.load(open(self.ea_users_followers_path, 'rb'))
             tmp_followers = {}
             for uid in followers:
                 tmp_followers[uid] = {}
@@ -805,8 +771,8 @@ class Tweet:
                 if cnt % 100 == 0:
                     print('User {} is handled!'.format(cnt))
 
-            pickle.dump(sub_followings_dict, open(self.users_sub_followings_path, 'wb'))
-            print("sub_following_list created!! {}".format(self.users_sub_followings_path))
+            pickle.dump(sub_followings_dict, open(self.ea_users_sub_followings_path, 'wb'))
+            print("sub_following_list created!! {}".format(self.ea_users_sub_followings_path))
     
     '''
     ## Find L, R, N videos
@@ -976,8 +942,8 @@ class Tweet:
     ## Return the tweet cascade of a given video by id
     def getTweetCascadeByVideoId(self, tweets, video_id):
         related_tweets = self.getTweetsByVideoId(tweets, video_id)
-        #connection_list = pickle.load(open(self.users_followers_path, 'rb'))
-        sub_followings_dict = pickle.load(open(self.users_sub_followings_path, 'rb'))
+        #connection_list = pickle.load(open(self.ea_users_followers_path, 'rb'))
+        sub_followings_dict = pickle.load(open(self.ea_users_sub_followings_path, 'rb'))
         
         user_time_dict = {}
         user_tweet_type_dict = {}
@@ -1219,7 +1185,7 @@ class Tweet:
     ## Returns video_promotion_delta = {vid_1: {uid_1: seconds, uid_2: seconds, ...}, ...}
     def getNetworkStructureMeasuresByVideoId(self, tweets, video_id, users_num_followers, users_leaning_probs, users_leaning_labels, nw_type):
         related_tweets = self.getTweetsByVideoId(tweets, video_id)
-        sub_followings_dict = pickle.load(open(self.users_sub_followings_path, 'rb'))
+        sub_followings_dict = pickle.load(open(self.ea_users_sub_followings_path, 'rb'))
         
         users_num_tweets = {}
         video_tweets_info = []
@@ -1374,7 +1340,7 @@ class Tweet:
         users_num_followers = {}
         for uid in users:
             users_num_followers[uid] = int(users[uid]['_source']['followers_count'])
-        users_leaning_scores = pickle.load(open(self.users_inferred_leanings_scores_path, 'rb'))
+        users_leaning_scores = pickle.load(open(self.ea_users_inferred_leanings_scores_path, 'rb'))
         users_leaning_probs = {}
         users_leaning_labels = {}
         for uid in users_leaning_scores:
@@ -1520,7 +1486,7 @@ class Tweet:
     
     
     def getTemporalMeasuresByVideoId(self, tweets, video_id):
-        sub_followings_dict = pickle.load(open(self.users_sub_followings_path, 'rb'))
+        sub_followings_dict = pickle.load(open(self.ea_users_sub_followings_path, 'rb'))
         related_tweets = self.getTweetsByVideoId(tweets, video_id)
         
         video_tweets_info = []
@@ -1818,7 +1784,7 @@ class Tweet:
     
     ## Calcuate geographical measures for all filtered videos.
     def getAllNetworkGeographicalMeasures(self, tweets):
-        user_locs = pickle.load(open(self.users_locs_path, 'rb'))
+        user_locs = pickle.load(open(self.ea_users_locs_path, 'rb'))
         
         geo_measures = {}
         if os.path.isfile(self.video_tweet_geo_measures_path):
@@ -2074,8 +2040,8 @@ class Tweet:
     
     def analyzeAssortativityLeaningRelation(self, tweets, video_id):
         related_tweets = self.getTweetsByVideoId(tweets, video_id)
-        sub_followings_dict = pickle.load(open(self.users_sub_followings_path, 'rb'))
-        users_leaning_scores = pickle.load(open(self.users_inferred_leanings_scores_path, 'rb'))
+        sub_followings_dict = pickle.load(open(self.ea_users_sub_followings_path, 'rb'))
+        users_leaning_scores = pickle.load(open(self.ea_users_inferred_leanings_scores_path, 'rb'))
         
         users_leaning_probs = {}
         users_leaning_labels = {}
@@ -2453,11 +2419,11 @@ class Tweet:
     ## followers, etc.
     def summarizeCommunities(self):
         users = pickle.load(open(self.users_path, 'rb'))
-        users_locs = pickle.load(open(self.users_locs_path, 'rb'))
-        tweets = pickle.load(open(self.available_tweets_path, 'rb'))
+        users_locs = pickle.load(open(self.ea_users_locs_path, 'rb'))
+        tweets = pickle.load(open(self.ea_tweets_path, 'rb'))
         user_comm_pairs = pickle.load(open(self.users_communities_path, 'rb'))
         
-        connection_list = pickle.load(open(self.users_followers_path, 'rb'))
+        connection_list = pickle.load(open(self.ea_users_followers_path, 'rb'))
         
         communities = list(set(list(user_comm_pairs['assigned_com_memberships'].values())))
         num_communities = len(communities)
@@ -2566,7 +2532,7 @@ class Tweet:
     ## measure_type = [user | tweet | retweet]
     def getLocationsByCommunities(self, tweets, measure_type):
         users = pickle.load(open(self.users_path, 'rb'))
-        users_locs = pickle.load(open(self.users_locs_path, 'rb'))
+        users_locs = pickle.load(open(self.ea_users_locs_path, 'rb'))
         #tweets = pickle.load(open(self.tweets_path, 'rb'))
         user_comm_pairs = pickle.load(open(self.users_communities_path, 'rb'))
         
@@ -2638,8 +2604,8 @@ class Tweet:
     ## check #users from each political leaning in the communities.
     def checkLeaningsInCommunities(self):
         user_comm_pairs = pickle.load(open(self.users_communities_path, 'rb'))
-        users_leanings_labels = pickle.load(open(self.users_leanings_labels_path, 'rb'))
-        users_inferred_leanings_scores = pickle.load(open(self.users_inferred_leanings_scores_path, 'rb'))
+        users_leanings_labels = pickle.load(open(self.ea_users_leanings_labels_path, 'rb'))
+        users_inferred_leanings_scores = pickle.load(open(self.ea_users_inferred_leanings_scores_path, 'rb'))
         
         communities = list(set(list(user_comm_pairs['assigned_com_memberships'].values())))
         num_communities = len(communities)
@@ -2711,7 +2677,7 @@ class Tweet:
     def getTweetCascadesOfCommunitiesByVideoId(self, tweets, video_id, super_com):
         related_tweets = self.getTweetsOfCommunitiesByVideoId(tweets, video_id, super_com)
         
-        connection_list = pickle.load(open(self.users_followers_path, 'rb'))
+        connection_list = pickle.load(open(self.ea_users_followers_path, 'rb'))
         
         user_time_dict = {}
         for tweet in related_tweets:
@@ -2800,7 +2766,7 @@ class Tweet:
     ## are collected in different times
     def checkConnectionChanges(self):
         users = pickle.load(open(self.users_path, 'rb'))
-        connection_list = pickle.load(open(self.users_followers_path, 'rb'))
+        connection_list = pickle.load(open(self.ea_users_followers_path, 'rb'))
         user_comm_pairs = pickle.load(open(self.users_communities_path, 'rb'))
         communities = list(set(list(user_comm_pairs['assigned_com_memberships'].values())))
         

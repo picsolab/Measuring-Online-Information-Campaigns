@@ -5,7 +5,7 @@ import sys
 
 ## create followers/friends data by merging csv files of followers/friends collected from Twitter.
 def createFollowersFriendsData(campaign, connection_type):
-    input_folder = 'data/{}/{}_raw/'.format(campaign, connection_type)
+    input_folder = 'data/{}/ea_{}_raw/'.format(campaign, connection_type)
     file_names = []
     for root, dirs, files in os.walk(input_folder):
         for filename in files:
@@ -22,13 +22,13 @@ def createFollowersFriendsData(campaign, connection_type):
                 lis[-1] = lis[-1].strip()
                 user_connections[lis[0].strip()] = lis[1:]
     
-    out_file = '../data/social_media/{}/{}_2020.pkl'.format(campaign, connection_type)
+    out_file = '../data/social_media/{}/ea_{}_2020.pkl'.format(campaign, connection_type)
     pickle.dump(user_connections, open(out_file, 'wb'))
 
 ## Create the subset of followers/friends list for each user to have this info at the time when data collected.
 def createPartialConnectionListData(campaign, connection_type, year):
-    connection_list_file = '../data/social_media/{}/{}_2020.pkl'.format(campaign, connection_type)
-    out_file = '../data/social_media/{}/{}_{}.pkl'.format(campaign, connection_type, str(year))
+    connection_list_file = '../data/social_media/{}/ea_{}_2020.pkl'.format(campaign, connection_type)
+    out_file = '../data/social_media/{}/ea_{}_{}.pkl'.format(campaign, connection_type, str(year))
     connection_list = pickle.load(open(connection_list_file, 'rb'))
     users = pickle.load(open('../data/social_media/{}/all_users_by_relevant_videos.pkl'.format(campaign), 'rb'))
     connection_list_partial = {}
@@ -70,7 +70,7 @@ def mergeGraphWeightFiles(campaign, connection_type, year):
                 input_files.append(input_folder + filename)
                 print(input_folder + filename)
     
-    out_file = '../data/social_media/{}/graph_edges/{}_{}.txt'.format(campaign, connection_type, str(year))
+    out_file = '../data/social_media/{}/graph_edges/ea_{}_{}.txt'.format(campaign, connection_type, str(year))
     with open(out_file, 'w') as outfile:
         for fname in input_files:
             with open(fname) as infile:

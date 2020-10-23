@@ -126,7 +126,6 @@ if __name__ == '__main__':
     ## [abo | gun | blm]
     campaign = 'blm'
     
-    #path_inp = '../data/social_media/{}/all_users_by_filtered_videos.pkl'.format(campaign)
     path_inp = '../data/social_media/{}/ea_users_uids_raw.pkl'.format(campaign)
     path_out = '../data/social_media/{}/ea_users_suspended_or_not.pkl'.format(campaign, campaign)
     
