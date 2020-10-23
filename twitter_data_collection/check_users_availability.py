@@ -122,15 +122,13 @@ class KeyChain(object):
 
 if __name__ == '__main__':
     keyC = KeyChain(tokens)
-    #response = keyC(query='https://api.twitter.com/1.1/followers/ids.json?cursor={CUR}&count=5000&user_id={UID}'.format(CUR=-1, UID=uid))
-    #response = keyC(query='https://api.twitter.com/1.1/users/lookup.json?user_id={UID}'.format(UID='814423198364147713,6253282,224499494'))
-    #crawled_data = response.json()
-    #print(response)
     
-    campaign = 'gun'
+    ## [abo | gun | blm]
+    campaign = 'blm'
     
-    path_inp = 'data/{}/{}_all_users_additional_user_ids.pkl'.format(campaign, campaign)
-    path_out = 'data/{}/{}_all_users_additional_users_suspended_or_not.pkl'.format(campaign, campaign)
+    #path_inp = '../data/social_media/{}/all_users_by_filtered_videos.pkl'.format(campaign)
+    path_inp = '../data/social_media/{}/ea_users_uids_raw.pkl'.format(campaign)
+    path_out = '../data/social_media/{}/ea_users_suspended_or_not.pkl'.format(campaign, campaign)
     
     user_ids = pickle.load(open(path_inp, 'rb'))
     user_ids = list(user_ids.keys())

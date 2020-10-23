@@ -18,7 +18,11 @@ def createSAMWeights(campaign, start_idx, end_idx, keys, connection_type, connec
     print(campaign.upper() + ": (" + str(start_idx) + "--" + str(end_idx) + ") started!")
     sys.stdout.flush()
     
-    out_file_name = 'data/{}/graph_edges/sam/{}/{}_{}_{}.txt'.format(campaign, str(year), connection_type, str(start_idx), str(end_idx))
+    data_dir = "../data/social_media/{}/graph_edges/{}/".format(campaign, str(year))
+    if not os.path.exists(data_dir):
+        os.makedirs(data_dir)
+    
+    out_file_name = os.path.join(data_dir, '{}_{}_{}.txt'.format(connection_type, str(start_idx), str(end_idx)))
     out_file = open(out_file_name, "w")
     
     for i in range(start_idx, end_idx):
@@ -44,17 +48,15 @@ def createSAMWeights(campaign, start_idx, end_idx, keys, connection_type, connec
 
 
 def main():
-    ## [blm | gun | abo | cli | img]
-    campaign = 'gun_ea_20'
+    ## [abo | gun | blm]
+    campaign = 'blm'
     ## [followers | friends]
     connection_type = 'followers'
-    ## [2017 | 2018 | 2020]
+    ## [2018 | 2020]
     year = 2018
-    ## [sam | pmi]
-    method_type = "sam"
     num_workers = 15
     
-    followers_friends_list_file = 'data/{}/{}_{}.pkl'.format(campaign, connection_type, str(year))
+    followers_friends_list_file = '../data/social_media/{}/{}_{}.pkl'.format(campaign, connection_type, str(year))
     connection_list = pickle.load(open(followers_friends_list_file, 'rb'))
     print(followers_friends_list_file + " read!")
     sys.stdout.flush()

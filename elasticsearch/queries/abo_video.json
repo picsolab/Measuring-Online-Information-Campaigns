@@ -1,0 +1,33 @@
+{
+    "size": 5000,
+    "query": {
+        "bool": {
+            "should": [
+                {"terms": {"snippet.description":  ["abortion", "abortions", "prochoice", "prolife", "pro-life", "pro-choice", "ru-486", "#abortion", "#prochoice", "#prolife", "#pro-life", "#pro-choice", "#ru-486"]}},
+                {"match_phrase_prefix": {"snippet.description": "pro life"}},
+                {"match_phrase_prefix": {"snippet.description": "pro choice"}},
+                {"match_phrase": {"snippet.description": "ru 486"}},
+                {"match_phrase_prefix": {"snippet.description": "planned parenthood"}},
+                {"match_phrase_prefix": {"snippet.description": "unborn baby"}},
+                {"match_phrase_prefix": {"snippet.description": "unborn babies"}},
+                {"match_phrase_prefix": {"snippet.description": "unborn child"}},
+                {"match_phrase_prefix": {"snippet.description": "roe v. wade"}},
+                {"match_phrase_prefix": {"snippet.description": "roe versus wade"}},
+                {"match_phrase_prefix": {"snippet.description": "reproductive health care"}},
+                {"match_phrase_prefix": {"snippet.description": "birth control"}},
+                {"terms": {"snippet.title": ["abortion", "abortions", "prochoice", "prolife", "pro-life", "pro-choice", "ru-486", "#abortion", "#prochoice", "#prolife", "#pro-life", "#pro-choice", "#ru-486"]}},
+                {"match_phrase_prefix": {"snippet.title": "pro life"}},
+                {"match_phrase_prefix": {"snippet.title": "pro choice"}},
+                {"match_phrase": {"snippet.title": "ru 486"}},
+                {"match_phrase_prefix": {"snippet.title": "planned parenthood"}},
+                {"match_phrase_prefix": {"snippet.title": "unborn baby"}},
+                {"match_phrase_prefix": {"snippet.title": "unborn babies"}},
+                {"match_phrase_prefix": {"snippet.title": "unborn child"}},
+                {"match_phrase_prefix": {"snippet.title": "roe v. wade"}},
+                {"match_phrase_prefix": {"snippet.title": "roe versus wade"}},
+                {"match_phrase_prefix": {"snippet.title": "reproductive health care"}},
+                {"match_phrase_prefix": {"snippet.title": "birth control"}}
+            ]
+        }
+    }
+}
