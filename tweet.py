@@ -13,7 +13,6 @@ from operator import itemgetter
 import os
 import location
 import re
-#import mat
 import matplotlib.pyplot as plt
 import seaborn as sns
 from scipy.stats import entropy
