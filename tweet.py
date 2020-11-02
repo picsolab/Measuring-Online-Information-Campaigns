@@ -24,13 +24,19 @@ import math
 import graph_ops
 from scipy.stats import pearsonr, spearmanr, ttest_ind, mannwhitneyu, kruskal, ks_2samp
 from empath import Empath
-#from src.language.text_parser import EkphrasisParser
-#from src.language import liwc
+from src.language.text_parser import EkphrasisParser
+from src.language import liwc
 
 mapping = {
     "abo": {"left": 0.53784, "right": 0.74940},
     "gun": {"left": 0.47838, "right": 0.71606}, 
     "blm": {"left": 0.52373, "right": 0.69474}
+}
+
+community_resolution_param = {
+    "abo": 1,
+    "gun": 0.8, 
+    "blm": 1
 }
 
 class Tweet:
@@ -54,31 +60,31 @@ class Tweet:
         self.ea_users_sub_followings_path = 'data/social_media/{}/ea_users_sub_followings_{}.pkl'.format(self.util.campaign,
                                                                                                    str(self.util.year))
         
-        
         self.left_seed_political_hashtags_path = 'data/leaning_keywords/left_political.txt'
         self.right_seed_political_hashtags_path = 'data/leaning_keywords/right_political.txt'
-        self.left_extended_political_hashtags_path = 'data/social_media/{}/left_political_hashtags_extended.txt'.format(self.campaign)
-        self.right_extended_political_hashtags_path = 'data/social_media/{}/right_political_hashtags_extended.txt'.format(self.campaign)
+        self.left_extended_political_hashtags_path = 'data/social_media/{}/left_political_hashtags_extended.txt'.format(self.util.campaign)
+        self.right_extended_political_hashtags_path = 'data/social_media/{}/right_political_hashtags_extended.txt'.format(self.util.campaign)
         self.ea_users_leanings_labels_path = 'data/social_media/{}/ea_users_leanings_labels.pkl'.format(self.util.campaign)
         self.ea_users_inferred_leanings_scores_path = 'data/social_media/{}/ea_users_inferred_leanings_scores.pkl'.format(self.util.campaign)
         
+        ## Early adopters' communities path
+        self.ea_communities_path = 'data/social_media/{}/ea_communities_{}_res_{}.pkl'.format(self.util.campaign,
+                                                                                              str(self.util.year),
+                                                                                              community_resolution_param[self.util.campaign])
         
-        self.video_tweet_cascades_path = 'data/from_anu/v1/{}_{}_video_tweet_cascades_basic.pkl'.format(self.util.campaign, 
-                                                                                                  self.util.ea_type)
-        self.video_tweet_structural_measures_potential_path = "data/from_anu/v1/{}_{}_video_tweet_structural_measures_potential.pkl".format(self.util.campaign, self.util.ea_type)
-        self.video_tweet_structural_measures_temporal_path = "data/from_anu/v1/{}_{}_video_tweet_structural_measures_temporal.pkl".format(self.util.campaign, self.util.ea_type)
-        self.video_tweet_structural_measures_cascade_path = "data/from_anu/v1/{}_{}_video_tweet_structural_measures_cascade.pkl".format(self.util.campaign, self.util.ea_type)
-        self.video_tweet_temporal_measures_path = "data/from_anu/v1/{}_{}_video_tweet_temporal_measures.pkl".format(self.util.campaign, self.util.ea_type)
-        self.video_tweet_geo_measures_path = "data/from_anu/v1/{}_{}_video_tweet_geo_measures.pkl".format(self.util.campaign, self.util.ea_type)
-        
-        self.video_tweet_language_liwc_measures_path = "data/from_anu/v1/{}_{}_video_tweet_language_liwc_measures.pkl".format(self.util.campaign, self.util.ea_type)
-        self.video_tweet_language_empath_measures_path = "data/from_anu/v1/{}_{}_video_tweet_language_empath_measures.pkl".format(self.util.campaign, self.util.ea_type)
-        
-        self.video_tweet_engagement_measures_path = "data/from_anu/v1/{}_{}_video_tweet_engagement_measures.pkl".format(self.util.campaign, self.util.ea_type)
-        
-        
-        
+        ## Video leaning thresholds
         self.predefined_video_leaning_thr = mapping[self.util.campaign]
+        
+        ## Video leaning thresholds
+        self.ea_network_structural_measures_path = "data/social_media/{}/ea_network_structural_measures.pkl".format(self.util.campaign)
+        self.ea_engagement_measures_path = "data/social_media/{}/ea_engagement_measures.pkl".format(self.util.campaign)
+        self.ea_temporal_measures_path = "data/social_media/{}/ea_temporal_measures.pkl".format(self.util.campaign)
+        self.ea_language_liwc_measures_path = "data/social_media/{}/ea_language_liwc_measures.pkl".format(self.util.campaign)
+        self.ea_language_empath_measures_path = "data/social_media/{}/ea_language_empath_measures.pkl".format(self.util.campaign)
+        self.ea_cascade_measures_path = 'data/social_media/{}/ea_cascade_measures.pkl'.format(self.util.campaign)
+        #self.ea_geo_measures_path = "data/social_media/{}/ea_geo_measures.pkl".format(self.util.campaign)
+        
+        
         
         self.bin_size = self.util.bin_size
         self.daily_dates = self.util.daily_dates
@@ -86,14 +92,12 @@ class Tweet:
         self.active_videos_ids = 'data/from_anu/_active_videos.pkl'
         self.video_annotations_path = 'data/from_anu/v1/{}_video_annotations.csv'.format(self.util.campaign)
         self.all_videos_from_annotated_videos_path = 'data/from_anu/v1/{}_all_videos_from_annotated_videos.pkl'.format(self.util.campaign)
-        #self.num_tweets_per_video_path = "data/from_anu/v1/{}_num_tweets_per_video.pkl".format(self.util.campaign)
-        #self.filtered_video_ids_from_available_tweets_path = "data/from_anu/v1/{}_filtered_video_ids_from_available_tweets.pkl".format(self.util.campaign)
+        
     
     def getTweetVolumeDistribution(self, data):
 
         daily_counts = np.zeros((len(self.daily_dates)))
         for item in data.values():
-            #print(item)
             created_at = item['_source']['created_at']
             daily_counts[self.daily_dates.index(created_at)] += 1
         
@@ -188,7 +192,7 @@ class Tweet:
     
     ## Print tweets referring the the specific video within a specific week
     def printTweetsByVideoId(self, tweets, start_date, end_date, video_id):
-        #user_comm_pairs = pickle.load(open(self.users_communities_path, 'rb'))
+        #user_comm_pairs = pickle.load(open(self.ea_communities_path, 'rb'))
         for tweet_id in tweets:
             user_id = tweets[tweet_id]['_source']['user_id_str']
             #if user_id in user_comm_pairs['assigned_com_memberships']:
@@ -279,7 +283,7 @@ class Tweet:
         else:
             tweets = pickle.load(open(self.tweets_path, 'rb'))
             followers = pickle.load(open(self.ea_users_followers_path, 'rb'))
-            filtered_video_ids = pickle.load(open(self.videos_path), 'rb')
+            filtered_video_ids = pickle.load(open(self.videos_path, 'rb'))
             filtered_video_ids = list(filtered_video_ids.keys())
             
             video_early_adopters = self.findEarlyAdopters(ea_ratio, tweets, filtered_video_ids)
@@ -289,11 +293,11 @@ class Tweet:
                 all_ea_tweet_ids.extend([item[1] for item in video_early_adopters[video_id]])
                 
                 cnt += len([item[1] for item in video_early_adopters[video_id]])
-                print(len([item[1] for item in video_early_adopters[video_id]]))
+                #print(len([item[1] for item in video_early_adopters[video_id]]))
             
-            print('cnt:', cnt)
-            print('all_ea_tweet_ids:', len(all_ea_tweet_ids))
-            print('all_ea_tweet_ids:', len(set(all_ea_tweet_ids)))
+            #print('cnt:', cnt)
+            #print('all_ea_tweet_ids:', len(all_ea_tweet_ids))
+            #print('all_ea_tweet_ids:', len(set(all_ea_tweet_ids)))
             
             available_ea_tweets = {}
             for tid in all_ea_tweet_ids:
@@ -308,7 +312,7 @@ class Tweet:
         
             pickle.dump(available_ea_tweets, open(self.ea_tweets_path, 'wb'))
             pickle.dump(available_ea_user_ids, open(self.ea_users_ids_path, 'wb'))
-            return available_tweets
+            return available_ea_tweets
     
     
     ## Summarize users and tweets by suspended, protected and available.
@@ -400,8 +404,6 @@ class Tweet:
             tweets = [item[1] for item in video_tweets[video_id]]
             timestamps = np.array([int(item[2]) for item in video_tweets[video_id]])
             created_ats = np.array([item[3] for item in video_tweets[video_id]])
-            a = [(datetime.fromtimestamp(int(timestamp)/1000.0)).strftime('%Y{0}%m{0}%d'.format('-')) for timestamp in timestamps]
-            #print(a)
             #print(created_ats)
             timestamps_idx = np.argsort(timestamps)
             timestamps_sorted = list(itemgetter(*timestamps_idx)(timestamps))
@@ -630,17 +632,8 @@ class Tweet:
     ###########################################################################
     ## Get filtered video ids
     def getFilteredVideoIds(self):
-        filtered_video_ids = []
-        with open(self.video_annotations_path) as csv_file:
-            csv_reader = csv.reader(csv_file, delimiter=',')
-            line_count = 0
-            for row in csv_reader:
-                video_id = row[0]
-                label = row[3]
-                if label == '1':
-                    filtered_video_ids.append(video_id)
-                line_count += 1
-            print('Processed {} lines.'.format(line_count))
+        filtered_video_ids = pickle.load(open(self.videos_path, 'rb'))
+        filtered_video_ids = list(filtered_video_ids.keys())
         print('len(filtered_video_ids):', len(filtered_video_ids))
         return filtered_video_ids
     
@@ -670,7 +663,6 @@ class Tweet:
     def assignVideoLeaningLabels(self, tweets):
         users_inferred_leanings_scores = pickle.load(open(self.ea_users_inferred_leanings_scores_path, 'rb'))
         filtered_video_ids = self.getFilteredVideoIds()
-        #filtered_videos = self.filterVideos(tweets, min_occ_in_available_users, context_relevant_tweet_ratio)
         counter = 0
         ## assign leanings to videos.
         video_users_probs = {}
@@ -774,95 +766,16 @@ class Tweet:
             pickle.dump(sub_followings_dict, open(self.ea_users_sub_followings_path, 'wb'))
             print("sub_following_list created!! {}".format(self.ea_users_sub_followings_path))
     
-    '''
+    
     ## Find L, R, N videos
     def separateVideosByLeaning(self, video_leanings_probs):
-        news_outlets_siqi = pd.read_csv('data/media_bias/news_outlets_siqi.csv')
-        refluence = pd.read_csv('data/media_bias/refluence.csv')
-        news_outlets_siqi.dropna(subset=['YTId'], inplace=True)
-        videos = pickle.load(open(self.all_videos_from_annotated_videos_path, 'rb'))
+        recfluence = pd.read_csv('data/media_bias/recfluence.csv')
+        recfluence.dropna(subset=['CHANNEL_ID', 'LR'], inplace=True)
+        recfluence = recfluence[['CHANNEL_ID', 'CHANNEL_TITLE', 'LR']]
+        #print(recfluence.head())
+        videos = pickle.load(open(self.videos_path, 'rb'))
         
-        siqi_refluence_union_yt_channels = set(news_outlets_siqi['YTId']).union(set(refluence['CHANNEL_ID']))
-        
-        cid2vid_dict = {}
-        for vid in video_leanings_probs:
-            cid = videos[vid]['_source']['snippet']['channelId']
-            right_leaning_prob = video_leanings_probs[vid]['right']
-            if cid not in cid2vid_dict:
-                cid2vid_dict[cid] = []
-                cid2vid_dict[cid].append(right_leaning_prob)
-            else:
-                cid2vid_dict[cid].append(right_leaning_prob)
-        
-        inferred_leaning_probs = {'YTId': [], 'avg_cid_probs': [], 'num_videos_per_cid': []}
-        for cid in siqi_refluence_union_yt_channels.intersection(cid2vid_dict.keys()):
-            inferred_leaning_probs['YTId'].append(cid)
-            inferred_leaning_probs['avg_cid_probs'].append(np.mean(cid2vid_dict[cid]))
-            inferred_leaning_probs['num_videos_per_cid'].append(len(cid2vid_dict[cid]))
-        inferred_leaning_probs = pd.DataFrame.from_dict(inferred_leaning_probs)
-        
-        ## Unioin of both datasets
-        df_union = pd.merge(news_outlets_siqi.set_index('YTId', drop=True), refluence.set_index('CHANNEL_ID', drop=True), 
-                            how='outer', left_on=['YTId'], right_on=['CHANNEL_ID'], left_index=True, 
-                            right_index=True).reset_index()
-        df_union = df_union.join(inferred_leaning_probs.set_index('YTId'), how='left', on='YTId')
-        #print(len(df_union))
-        #print(df_union.columns)
-
-        df_union.dropna(subset=['avg_cid_probs'], inplace=True)
-        print(len(df_union))
-
-        common_union_df = df_union[df_union['YTId'].isin(cid2vid_dict.keys())]
-        print(len(common_union_df))
-
-        channel_political_ideologies = {}
-        for cid in cid2vid_dict:
-            siqi_ideology = df_union.loc[df_union['YTId'] == cid, 'Ideology'].values
-            refluence_ideology = df_union.loc[df_union['YTId'] == cid, 'LR'].values
-            gt_leaning = None
-            if len(siqi_ideology) > 0 and not pd.isnull(siqi_ideology[0]):
-                if siqi_ideology[0] == 'Left' or siqi_ideology[0] == 'Left-center':
-                    gt_leaning = 'L'
-                elif siqi_ideology[0] == 'Right' or siqi_ideology[0] == 'Right-center':
-                    gt_leaning = 'R'
-                else:
-                    gt_leaning = 'C'
-            elif len(refluence_ideology) > 0 and not pd.isnull(refluence_ideology[0]):
-                gt_leaning = refluence_ideology[0]
-
-            if gt_leaning:
-                channel_political_ideologies[cid] = gt_leaning
-                #print(cid, siqi_ideology, refluence_ideology, gt_leaning)
-        
-        vids = {'L': [], 'R': [], 'N': []}
-        for vid in video_leanings_probs:
-            cid = videos[vid]['_source']['snippet']['channelId']
-            if cid in channel_political_ideologies:
-                c_leaning = channel_political_ideologies[cid]
-                if c_leaning == 'C':
-                    vids['N'].append(vid)
-                else:
-                    vids[channel_political_ideologies[cid]].append(vid)
-            else:
-                right_leaning_prob = np.mean(cid2vid_dict[cid])
-                if right_leaning_prob < self.predefined_video_leaning_thr['left']:
-                    vids['L'].append(vid)
-                elif right_leaning_prob > self.predefined_video_leaning_thr['right']:
-                    vids['R'].append(vid)
-                else:
-                    vids['N'].append(vid)
-        
-        return vids
-    '''
-    ## Find L, R, N videos
-    def separateVideosByLeaning(self, video_leanings_probs):
-        refluence = pd.read_csv('data/media_bias/refluence.csv')
-        refluence.dropna(subset=['CHANNEL_ID', 'LR'], inplace=True)
-        refluence = refluence[['CHANNEL_ID', 'CHANNEL_TITLE', 'LR']]
-        #print(refluence.head())
-        videos = pickle.load(open(self.all_videos_from_annotated_videos_path, 'rb'))
-        
-        refluence_channel_ids = set(refluence['CHANNEL_ID'])
+        recfluence_channel_ids = set(recfluence['CHANNEL_ID'])
                 
         cid2vid_dict = {}
         for vid in video_leanings_probs:
@@ -876,8 +789,8 @@ class Tweet:
         
         #topic
         print('#channels: {}, #videos: {}'.format(len(cid2vid_dict.keys()), sum([len(cid2vid_dict[cid]) for cid in cid2vid_dict])))
-        #refluence.intersect(topic)
-        common_yt_channel_ids = refluence_channel_ids.intersection(set(cid2vid_dict.keys()))
+        #recfluence.intersect(topic)
+        common_yt_channel_ids = recfluence_channel_ids.intersection(set(cid2vid_dict.keys()))
         print('#channels from rec. n dataset: {}, #videos from rec. n dataset: {}'.format(len(common_yt_channel_ids), sum([len(cid2vid_dict[cid]) for cid in common_yt_channel_ids])))
 
         
@@ -888,7 +801,7 @@ class Tweet:
             inferred_leaning_probs['num_videos_per_cid'].append(len(cid2vid_dict[cid]))
         inferred_leaning_probs = pd.DataFrame.from_dict(inferred_leaning_probs)
         
-        df_union = refluence.merge(inferred_leaning_probs, left_on='CHANNEL_ID', right_on='CHANNEL_ID')
+        df_union = recfluence.merge(inferred_leaning_probs, left_on='CHANNEL_ID', right_on='CHANNEL_ID')
         df_union.dropna(subset=['avg_cid_probs'], inplace=True)
         df_union = df_union.set_index('CHANNEL_ID')
 
@@ -938,11 +851,10 @@ class Tweet:
         
         return vids_new
                 
-
+    ## CASCADE MEASURES  ########################################################################
     ## Return the tweet cascade of a given video by id
     def getTweetCascadeByVideoId(self, tweets, video_id):
         related_tweets = self.getTweetsByVideoId(tweets, video_id)
-        #connection_list = pickle.load(open(self.ea_users_followers_path, 'rb'))
         sub_followings_dict = pickle.load(open(self.ea_users_sub_followings_path, 'rb'))
         
         user_time_dict = {}
@@ -1001,8 +913,6 @@ class Tweet:
             
             followers_uids = related_followings_dict[user_ids[i]]
             followers = [user_ids.index(uid) for uid in followers_uids if uid in user_ids and user_ids.index(uid) < i]
-            #followers = np.where(user_follower_mat[i]==1)[0]
-            #followers = followers[followers<i]
             
             min_cascades = []
             max_cascades = []
@@ -1011,20 +921,13 @@ class Tweet:
                 max_cascades.append(all_cascade_list[fol_ind]['max'])
             
             if len(followers) == 0:
-                #if user_tweet_type_dict[user_ids[i]] == 'original' or user_tweet_type_dict[user_ids[i]] == 'reply':
                 all_cascade_list[i]['min'] = 1
                 all_cascade_list[i]['max'] = 1
-                '''
-                else:
-                    all_cascade_list[i]['min'] = 2
-                    all_cascade_list[i]['max'] = 2
-                '''
             else:
                 all_cascade_list[i]['min'] = min(min_cascades) + 1
                 all_cascade_list[i]['max'] = max(max_cascades) + 1
                 
                 users_immediate_neighbors[i].append(followers[min_cascades.index(min(min_cascades))])
-                
         
         cascades = {}
         for idx in all_cascade_list:
@@ -1035,8 +938,8 @@ class Tweet:
     ## Calcuate tweet cascade for all filtered videos.
     def getAllTweetCascades(self, tweets):
         cascades = {}
-        if os.path.isfile(self.video_tweet_cascades_path):
-            cascades = pickle.load(open(self.video_tweet_cascades_path, 'rb'))
+        if os.path.isfile(self.ea_cascade_measures_path):
+            cascades = pickle.load(open(self.ea_cascade_measures_path, 'rb'))
         else:
             video_ids = self.getFilteredVideoIds()
             cnt = 0
@@ -1047,14 +950,14 @@ class Tweet:
                 print("Cascade calcualted for {} !".format(vid))
                 cnt+=1
             
-            pickle.dump(cascades, open(self.video_tweet_cascades_path, 'wb'))
-            print("Cascades saved !! {}".format(self.video_tweet_cascades_path))
+            pickle.dump(cascades, open(self.ea_cascade_measures_path, 'wb'))
+            print("Cascades saved !! {}".format(self.ea_cascade_measures_path))
         
         return cascades
     
     ## Analyze cascade measures
     def analyzeCascadeMeasures(self, video_leanings_probs):
-        cascades = pickle.load(open(self.video_tweet_cascades_path, 'rb'))
+        cascades = pickle.load(open(self.ea_cascade_measures_path, 'rb'))
         vids = self.separateVideosByLeaning(video_leanings_probs)
         
         mean_cascades = {}
@@ -1066,38 +969,6 @@ class Tweet:
             median_cascades[vid] = np.median([cascades[vid][uid]['min'] for uid in cascades[vid]])
             max_cascadess[vid] = np.amax([cascades[vid][uid]['min'] for uid in cascades[vid]])
             num_sources[vid] = len([cascades[vid][uid]['min'] for uid in cascades[vid] if cascades[vid][uid]['min']==1])
-        
-        '''
-        mean_cascades_left = [mean_cascades[vid] for vid in mean_cascades 
-                              if video_leanings_probs[vid]['right'] < self.predefined_video_leaning_thr['left']]
-        mean_cascades_right = [mean_cascades[vid] for vid in mean_cascades 
-                              if video_leanings_probs[vid]['right'] > self.predefined_video_leaning_thr['right']]
-        mean_cascades_neutral = [mean_cascades[vid] for vid in mean_cascades 
-                                 if video_leanings_probs[vid]['right'] >= self.predefined_video_leaning_thr['left'] and 
-                                 video_leanings_probs[vid]['right'] <= self.predefined_video_leaning_thr['right']]
-        median_cascades_left = [median_cascades[vid] for vid in median_cascades 
-                                if video_leanings_probs[vid]['right'] < self.predefined_video_leaning_thr['left']]
-        median_cascades_right = [median_cascades[vid] for vid in median_cascades 
-                                 if video_leanings_probs[vid]['right'] > self.predefined_video_leaning_thr['right']]
-        median_cascades_neutral = [median_cascades[vid] for vid in median_cascades 
-                                   if video_leanings_probs[vid]['right'] >= self.predefined_video_leaning_thr['left'] and 
-                                   video_leanings_probs[vid]['right'] <= self.predefined_video_leaning_thr['right']]
-        max_cascades_left = [max_cascadess[vid] for vid in max_cascadess 
-                             if video_leanings_probs[vid]['right'] < self.predefined_video_leaning_thr['left']]
-        max_cascades_right = [max_cascadess[vid] for vid in max_cascadess 
-                              if video_leanings_probs[vid]['right'] > self.predefined_video_leaning_thr['right']]
-        max_cascades_neutral = [max_cascadess[vid] for vid in max_cascadess 
-                                if video_leanings_probs[vid]['right'] >= self.predefined_video_leaning_thr['left'] and 
-                                video_leanings_probs[vid]['right'] <= self.predefined_video_leaning_thr['right']]
-
-        num_sources_left = [num_sources[vid] for vid in num_sources 
-                            if video_leanings_probs[vid]['right'] < self.predefined_video_leaning_thr['left']]
-        num_sources_right = [num_sources[vid] for vid in num_sources 
-                             if video_leanings_probs[vid]['right'] > self.predefined_video_leaning_thr['right']]
-        num_sources_neutral = [num_sources[vid] for vid in num_sources 
-                               if video_leanings_probs[vid]['right'] >= self.predefined_video_leaning_thr['left'] and 
-                               video_leanings_probs[vid]['right'] <= self.predefined_video_leaning_thr['right']]
-        '''
         
         mean_cascades_left = [mean_cascades[vid] for vid in vids['L']]
         mean_cascades_right = [mean_cascades[vid] for vid in vids['R']]
@@ -1136,54 +1007,20 @@ class Tweet:
                                  ["Left", "Right", "Neutral"], "#sources", None, False)
 
         ## Significance test
-        print(mannwhitneyu(mean_cascades_left, mean_cascades_right, alternative='two-sided'))
-        print(mannwhitneyu(median_cascades_left, median_cascades_right, alternative='two-sided'))
-        print(mannwhitneyu(max_cascades_left, max_cascades_right, alternative='two-sided'))
-        print(mannwhitneyu(num_sources_left, num_sources_right, alternative='two-sided'))
-        print(kruskal(mean_cascades_left, mean_cascades_right, mean_cascades_neutral))
-        print(kruskal(median_cascades_left, median_cascades_right, median_cascades_neutral))
-        print(kruskal(max_cascades_left, max_cascades_right, max_cascades_neutral))
-        print(kruskal(num_sources_left, num_sources_right, num_sources_neutral))
-        print(ks_2samp(mean_cascades_left, mean_cascades_right))
-        print(ks_2samp(median_cascades_left, median_cascades_right))
-        print(ks_2samp(max_cascades_left, max_cascades_right))
-        print(ks_2samp(num_sources_left, num_sources_right))
-        '''
-        # Print probability distribution (right) of video leanings
-        print('left mean(mean_min) cascade:', np.mean(mean_cascades_left))
-        print('right mean(mean_min) cascade:', np.mean(mean_cascades_right))
-        print('neutral mean(mean_min) cascade:', np.mean(mean_cascades_neutral))
-        print('left median(mean_min) cascade:', np.median(mean_cascades_left))
-        print('right median(mean_min) cascade:', np.median(mean_cascades_right))
-        print('neutral median(mean_min) cascade:', np.median(mean_cascades_neutral))
-        print('left std(mean_min) cascade:', np.std(mean_cascades_left))
-        print('right std(mean_min) cascade:', np.std(mean_cascades_right))
-        print('neutral std(mean_min) cascade:', np.std(mean_cascades_neutral))
-
-        print('left mean(median_min) cascade:', np.mean(median_cascades_left))
-        print('right mean(median_min) cascade:', np.mean(median_cascades_right))
-        print('neutral mean(median_min) cascade:', np.mean(median_cascades_neutral))
-        print('left median(median_min) cascade:', np.median(median_cascades_left))
-        print('right median(median_min) cascade:', np.median(median_cascades_right))
-        print('neutral median(median_min) cascade:', np.median(median_cascades_neutral))
-        print('left std(median_min) cascade:', np.std(median_cascades_left))
-        print('right std(median_min) cascade:', np.std(median_cascades_right))
-        print('neutral std(median_min) cascade:', np.std(median_cascades_neutral))
-
-        print('left mean(max_min_cascades) cascade:', np.mean(max_cascades_left))
-        print('right mean(max_min_cascades) cascade:', np.mean(max_cascades_right))
-        print('neutral mean(max_min_cascades) cascade:', np.mean(max_cascades_neutral))
-        print('left median(max_min_cascades) cascade:', np.median(max_cascades_left))
-        print('right median(max_min_cascades) cascade:', np.median(max_cascades_right))
-        print('neutral median(max_min_cascades) cascade:', np.median(max_cascades_neutral))
-        print('left std(max_min_cascades) cascade:', np.std(max_cascades_left))
-        print('right std(max_min_cascades) cascade:', np.std(max_cascades_right))
-        print('neutral std(max_min_cascades) cascade:', np.std(max_cascades_neutral))
-        '''
+        print("Mean Cascade Significant Test")
+        self.util.applySignificanceTest(mean_cascades_left, mean_cascades_right)
+        print("Median Cascade Significant Test")
+        self.util.applySignificanceTest(median_cascades_left, median_cascades_right)
+        print("Max Cascade (Depth) Significant Test")
+        self.util.applySignificanceTest(max_cascades_left, max_cascades_right)
+        print("Number of sources Significant Test")
+        self.util.applySignificanceTest(num_sources_left, num_sources_right)
+        
     
+    ## NW STRUCTURAL MEASURES  ####################################################################################
     ## Calculate how early early adopters promote the video in terms of seconds.
     ## Returns video_promotion_delta = {vid_1: {uid_1: seconds, uid_2: seconds, ...}, ...}
-    def getNetworkStructureMeasuresByVideoId(self, tweets, video_id, users_num_followers, users_leaning_probs, users_leaning_labels, nw_type):
+    def getNetworkStructureMeasuresByVideoId(self, tweets, video_id, users_num_followers, users_leaning_probs, users_leaning_labels):
         related_tweets = self.getTweetsByVideoId(tweets, video_id)
         sub_followings_dict = pickle.load(open(self.ea_users_sub_followings_path, 'rb'))
         
@@ -1200,7 +1037,6 @@ class Tweet:
                 users_num_tweets[user_id] += 1
         
         video_tweets_info_sorted = sorted(video_tweets_info, key=lambda tup: tup[2])        
-        #video_info = pickle.load(open(self.all_videos_from_annotated_videos_path, 'rb'))[video_id]
         
         user_ids = []
         for tup in video_tweets_info_sorted:
@@ -1222,12 +1058,8 @@ class Tweet:
         print('len(G): {}'.format(len(G)))
         for uid in user_ids:
             for uid_2 in sub_followings_dict[uid]:
-                if nw_type == 'potential':
-                    if uid_2 in user_ids:
-                        G.add_edge(uid, uid_2)
-                elif nw_type == 'temporal':
-                    if uid_2 in user_ids and user_ids.index(uid_2) < user_ids.index(uid):
-                        G.add_edge(uid, uid_2)
+                if uid_2 in user_ids:
+                    G.add_edge(uid, uid_2)
         
         nx.set_node_attributes(G, nw_attributes)
         
@@ -1335,7 +1167,7 @@ class Tweet:
     
     
     ## Calcuate structural measures for all filtered videos.
-    def getAllNetworkStructureMeasures(self, tweets, nw_type):
+    def getAllNetworkStructureMeasures(self, tweets):
         users = pickle.load(open(self.users_path, 'rb'))
         users_num_followers = {}
         for uid in users:
@@ -1349,14 +1181,7 @@ class Tweet:
                 users_leaning_probs[uid] = user_leaning_prob
                 #users_leaning_probs_raw[uid] = int(round(user_leaning_prob*10, 0))
                 #users_leaning_probs_abs[uid] = int(round(abs(user_leaning_prob-0.5)*10, 0))
-                '''
-                if user_leaning_prob > 0.5:
-                    users_leaning_labels[uid] = 'R'
-                elif user_leaning_prob < 0.5:
-                    users_leaning_labels[uid] = 'L'
-                else:
-                    users_leaning_labels[uid] = 'N'
-                '''
+                
                 if user_leaning_prob > self.predefined_video_leaning_thr['right']:
                     users_leaning_labels[uid] = 'R'
                 elif user_leaning_prob < self.predefined_video_leaning_thr['left']:
@@ -1365,21 +1190,14 @@ class Tweet:
                     users_leaning_labels[uid] = 'N'
         
         structural_measures = {}
-        
-        structural_measures_path = None
-        if nw_type == 'potential':
-            structural_measures_path = self.video_tweet_structural_measures_potential_path
-        elif nw_type == 'temporal':
-            structural_measures_path = self.video_tweet_structural_measures_temporal_path
-        
-        if os.path.isfile(structural_measures_path):
-            structural_measures = pickle.load(open(structural_measures_path, 'rb'))
+        if os.path.isfile(self.ea_network_structural_measures_path):
+            structural_measures = pickle.load(open(self.ea_network_structural_measures_path, 'rb'))
         else:
             video_ids = self.getFilteredVideoIds()
             cnt = 0
             for vid in video_ids:
                 print('Structural measures calculating for {} ... | cnt: {}'.format(vid, cnt))
-                nw_size, nw_max_indegree, nw_density, nw_in_degree_centrality_gini, nw_in_degree_centrality_mean, nw_in_degree_centrality_median, nw_out_degree_centrality_gini, nw_out_degree_centrality_mean, nw_out_degree_centrality_median, nw_closeness_centrality_max, nw_closeness_centrality_gini, nw_closeness_centrality_mean, nw_closeness_centrality_median, nw_betweenness_centrality_max, nw_betweenness_centrality_gini, nw_betweenness_centrality_mean, nw_betweenness_centrality_median, nw_global_efficiency, nw_degree_assortativity, nw_assortativity_leaning_probs_raw, nw_assortativity_leaning_probs_abs_nw1, nw_assortativity_leaning_probs_abs_nw2, nw_assortativity_leaning_labels,  nw_assortativity_num_tweets, nw_assortativity_num_followers = self.getNetworkStructureMeasuresByVideoId(tweets, vid, users_num_followers, users_leaning_probs, users_leaning_labels, nw_type)
+                nw_size, nw_max_indegree, nw_density, nw_in_degree_centrality_gini, nw_in_degree_centrality_mean, nw_in_degree_centrality_median, nw_out_degree_centrality_gini, nw_out_degree_centrality_mean, nw_out_degree_centrality_median, nw_closeness_centrality_max, nw_closeness_centrality_gini, nw_closeness_centrality_mean, nw_closeness_centrality_median, nw_betweenness_centrality_max, nw_betweenness_centrality_gini, nw_betweenness_centrality_mean, nw_betweenness_centrality_median, nw_global_efficiency, nw_degree_assortativity, nw_assortativity_leaning_probs_raw, nw_assortativity_leaning_probs_abs_nw1, nw_assortativity_leaning_probs_abs_nw2, nw_assortativity_leaning_labels,  nw_assortativity_num_tweets, nw_assortativity_num_followers = self.getNetworkStructureMeasuresByVideoId(tweets, vid, users_num_followers, users_leaning_probs, users_leaning_labels)
                 structural_measures[vid] = {"nw_size": nw_size, 
                                             "nw_max_indegree": nw_max_indegree, 
                                             "nw_density": nw_density,
@@ -1408,38 +1226,17 @@ class Tweet:
                 #print("Structural measures calcualted for {} !".format(vid))
                 cnt+=1
             
-            pickle.dump(structural_measures, open(structural_measures_path, 'wb'))
-            print("Structural measures saved !! {}".format(structural_measures_path))
+            pickle.dump(structural_measures, open(self.ea_network_structural_measures_path, 'wb'))
+            print("Structural measures saved !! {}".format(self.ea_network_structural_measures_path))
         
         return structural_measures
     
     ## Analyze Structural measures
-    def analyzeStructuralMeasures(self, measure_type, nw_type, video_leanings_probs):
+    def analyzeStructuralMeasures(self, measure_type, video_leanings_probs):
         structural_measures = {}
-        if nw_type == 'temporal':
-            structural_measures = pickle.load(open(self.video_tweet_structural_measures_temporal_path, 'rb'))
-        elif nw_type == 'potential':
-            structural_measures = pickle.load(open(self.video_tweet_structural_measures_potential_path, 'rb'))
-        
-        '''
-        for vid in structural_measures:
-            print('{} -- {}'.format(structural_measures_nx[vid][measure_type], structural_measures[vid][measure_type]))
-        '''
+        structural_measures = pickle.load(open(self.ea_network_structural_measures_path, 'rb'))
         
         vids = self.separateVideosByLeaning(video_leanings_probs)
-        
-        '''
-        none_left = [structural_measures[vid][measure_type] for vid in video_leanings_probs if video_leanings_probs[vid]['right'] < self.predefined_video_leaning_thr['left'] and (structural_measures[vid][measure_type] == None or math.isnan(structural_measures[vid][measure_type]) or math.isinf(structural_measures[vid][measure_type]))]
-        none_right = [structural_measures[vid][measure_type] for vid in video_leanings_probs if video_leanings_probs[vid]['right'] > self.predefined_video_leaning_thr['right'] and (structural_measures[vid][measure_type] == None or math.isnan(structural_measures[vid][measure_type]) or math.isinf(structural_measures[vid][measure_type]))]
-        none_neutral = [structural_measures[vid][measure_type] for vid in video_leanings_probs if video_leanings_probs[vid]['right'] >= self.predefined_video_leaning_thr['left'] and video_leanings_probs[vid]['right'] <= self.predefined_video_leaning_thr['right'] and (structural_measures[vid][measure_type] == None or math.isnan(structural_measures[vid][measure_type]) or math.isinf(structural_measures[vid][measure_type]))]
-        print('#none_left: {}'.format(len(none_left)))
-        print('#none_right: {}'.format(len(none_right)))
-        print('#none_neutral: {}'.format(len(none_neutral)))
-        
-        measures_left = [structural_measures[vid][measure_type] for vid in video_leanings_probs if video_leanings_probs[vid]['right'] < self.predefined_video_leaning_thr['left'] and (structural_measures[vid][measure_type] != None and not math.isnan(structural_measures[vid][measure_type]) and not math.isinf(structural_measures[vid][measure_type]))]
-        measures_right = [structural_measures[vid][measure_type] for vid in video_leanings_probs if video_leanings_probs[vid]['right'] > self.predefined_video_leaning_thr['right'] and (structural_measures[vid][measure_type] != None and not math.isnan(structural_measures[vid][measure_type]) and not math.isinf(structural_measures[vid][measure_type]))]
-        measures_neutral = [structural_measures[vid][measure_type] for vid in video_leanings_probs if video_leanings_probs[vid]['right'] >= self.predefined_video_leaning_thr['left'] and video_leanings_probs[vid]['right'] <= self.predefined_video_leaning_thr['right'] and (structural_measures[vid][measure_type] != None and not math.isnan(structural_measures[vid][measure_type]) and not math.isinf(structural_measures[vid][measure_type]))]
-        '''
         
         measures_left = [structural_measures[vid][measure_type] for vid in vids['L'] if (structural_measures[vid][measure_type] != None and not math.isnan(structural_measures[vid][measure_type]) and not math.isinf(structural_measures[vid][measure_type]))]
         measures_right = [structural_measures[vid][measure_type] for vid in vids['R'] if (structural_measures[vid][measure_type] != None and not math.isnan(structural_measures[vid][measure_type]) and not math.isinf(structural_measures[vid][measure_type]))]
@@ -1449,42 +1246,29 @@ class Tweet:
         print('#measures_right: {}'.format(len(measures_right)))
         print('#measures_neutral: {}'.format(len(measures_neutral)))
         
-        #print(measures_left)
-        #print(measures_right)
-        #print(measures_neutral)
-        
         ## Significance test
-        print(mannwhitneyu(measures_left, measures_right, alternative='two-sided'))
-        print(kruskal(measures_left, measures_right, measures_neutral))
-        print(ks_2samp(measures_left, measures_right))
+        self.util.applySignificanceTest(measures_left, measures_right)
         
         measures_left = np.array(measures_left, dtype='float64')
         measures_right = np.array(measures_right, dtype='float64')
         measures_neutral = np.array(measures_neutral, dtype='float64')
         
-        #if measure_type == 'global_efficiency' or measure_type == 'nw_max_indegree':
         if measure_type == 'nw_max_indegree':
             measures_left[measures_left==0] = 0.1
             measures_right[measures_right==0] = 0.1
             measures_neutral[measures_neutral==0] = 0.1
-        
-        #print(measures_left)
-        #print(measures_right)
-        #print(measures_neutral)
         
         is_log = False
         if measure_type == 'nw_size' or measure_type == 'nw_max_indegree':
             is_log = True
         
         ## Draw CDF and KDE for mean_min_cascades, median_min_cascades and max_min_cascades for left vs. right
-        '''
         self.util.plotCDFMultiple([measures_left, measures_right, measures_neutral], 
                                   ["Left", "Right", "Neutral"], measure_type, None, is_log)
         self.util.plotHistKDEMulitple([measures_left, measures_right, measures_neutral], 
                                       ["Left", "Right","Neutral"], measure_type, None, is_log)
-        '''
     
-    
+    ## TEMPORAL MEASURES  ###################################################################################
     def getTemporalMeasuresByVideoId(self, tweets, video_id):
         sub_followings_dict = pickle.load(open(self.ea_users_sub_followings_path, 'rb'))
         related_tweets = self.getTweetsByVideoId(tweets, video_id)
@@ -1526,7 +1310,7 @@ class Tweet:
             diff = float((timestamps[i] - timestamps[0])) / (60 * 1000)
             ts_diffs_to_first_tweet.append(diff)
             if diff < 0.:
-                print(vid, '*****sikinti*****')
+                print(vid, 'There is a problem')
         
         # calculate mean time difference w.r.t the first tweet
         nw_temporal_diff_wrt_first_tweet_mean = np.mean(ts_diffs_to_first_tweet)
@@ -1538,7 +1322,7 @@ class Tweet:
             diff = float((timestamps[i] - timestamps[i-1])) / (60 * 1000)
             ts_diffs_betweetn_tweets.append(diff)
             if diff < 0.:
-                print(vid, '*****sikinti*****')
+                print(vid, 'There is a problem')
         
         # calculate mean time difference between tweets
         nw_temporal_diff_between_pairs_mean = np.mean(ts_diffs_betweetn_tweets)
@@ -1574,8 +1358,8 @@ class Tweet:
     ## Calcuate temporal measures for all filtered videos.
     def getAllTemporalMeasures(self, tweets):
         temporal_measures = {}
-        if os.path.isfile(self.video_tweet_temporal_measures_path):
-            temporal_measures = pickle.load(open(self.video_tweet_temporal_measures_path, 'rb'))
+        if os.path.isfile(self.ea_temporal_measures_path):
+            temporal_measures = pickle.load(open(self.ea_temporal_measures_path, 'rb'))
         else:
             video_ids = self.getFilteredVideoIds()
             cnt = 0
@@ -1593,22 +1377,17 @@ class Tweet:
                 #print("Temporal measures calcualted for {} !".format(vid))
                 cnt+=1
             
-            pickle.dump(temporal_measures, open(self.video_tweet_temporal_measures_path, 'wb'))
-            print("Temporal measures saved !! {}".format(self.video_tweet_temporal_measures_path))
+            pickle.dump(temporal_measures, open(self.ea_temporal_measures_path, 'wb'))
+            print("Temporal measures saved !! {}".format(self.ea_temporal_measures_path))
         
         return temporal_measures
     
     ## Analyze Temporal measures
     def analyzeTemporalMeasures(self, measure_type, video_leanings_probs):
-        temporal_measures = pickle.load(open(self.video_tweet_temporal_measures_path, 'rb'))
+        temporal_measures = pickle.load(open(self.ea_temporal_measures_path, 'rb'))
         
         vids = self.separateVideosByLeaning(video_leanings_probs)
         
-        '''
-        measures_left = [temporal_measures[vid][measure_type] for vid in video_leanings_probs if video_leanings_probs[vid]['right'] < self.predefined_video_leaning_thr['left']]
-        measures_right = [temporal_measures[vid][measure_type] for vid in video_leanings_probs if video_leanings_probs[vid]['right'] > self.predefined_video_leaning_thr['right']]
-        measures_neutral = [temporal_measures[vid][measure_type] for vid in video_leanings_probs if video_leanings_probs[vid]['right'] >= self.predefined_video_leaning_thr['left'] and video_leanings_probs[vid]['right'] <= self.predefined_video_leaning_thr['right']]
-        '''
         measures_left = [temporal_measures[vid][measure_type] for vid in vids['L']]
         measures_right = [temporal_measures[vid][measure_type] for vid in vids['R']]
         measures_neutral = [temporal_measures[vid][measure_type] for vid in vids['N']]
@@ -1617,14 +1396,8 @@ class Tweet:
         print('#measures_right: {}'.format(len(measures_right)))
         print('#measures_neutral: {}'.format(len(measures_neutral)))
         
-        #print(measures_left)
-        #print(measures_right)
-        #print(measures_neutral)
-        
         ## Significance tests
-        print(mannwhitneyu(measures_left, measures_right, alternative='two-sided'))
-        print(kruskal(measures_left, measures_right, measures_neutral))
-        print(ks_2samp(measures_left, measures_right))
+        self.util.applySignificanceTest(measures_left, measures_right)
         
         measures_left = np.array(measures_left, dtype='float64')
         measures_right = np.array(measures_right, dtype='float64')
@@ -1642,7 +1415,7 @@ class Tweet:
                                       ["Left", "Right","Neutral"], '{} in seconds'.format(measure_type), None, True)
     
     
-    ## Engagement Measures
+    ## ENGAGEMENT MEASURES  ##########################################################################################
     def getEngagementMeasuresByVideoId(self, tweets, video_id):
         related_tweets = self.getTweetsByVideoId(tweets, video_id)
         users = []
@@ -1682,8 +1455,8 @@ class Tweet:
 
     def getAllEngagementMeasures(self, tweets):
         engagement_measures = {}
-        if os.path.isfile(self.video_tweet_engagement_measures_path):
-            engagement_measures = pickle.load(open(self.video_tweet_engagement_measures_path, 'rb'))
+        if os.path.isfile(self.ea_engagement_measures_path):
+            engagement_measures = pickle.load(open(self.ea_engagement_measures_path, 'rb'))
         else:
             video_ids = self.getFilteredVideoIds()
             cnt = 0
@@ -1699,14 +1472,14 @@ class Tweet:
                 #print("Engagement measures calcualted for {} !".format(vid))
                 cnt+=1
             
-            pickle.dump(engagement_measures, open(self.video_tweet_engagement_measures_path, 'wb'))
-            print("Engagement measures saved !! {}".format(self.video_tweet_engagement_measures_path))
+            pickle.dump(engagement_measures, open(self.ea_engagement_measures_path, 'wb'))
+            print("Engagement measures saved !! {}".format(self.ea_engagement_measures_path))
         
         return engagement_measures
     
     ## Analyze Engagement measures
     def analyzeEngagementMeasures(self, measure_type, video_leanings_probs):
-        engagement_measures = pickle.load(open(self.video_tweet_engagement_measures_path, 'rb'))
+        engagement_measures = pickle.load(open(self.ea_engagement_measures_path, 'rb'))
         vids = self.separateVideosByLeaning(video_leanings_probs)
         
         measures_left = [engagement_measures[vid][measure_type] for vid in vids['L']]
@@ -1716,13 +1489,8 @@ class Tweet:
         print('#measures_right: {}'.format(len(measures_right)))
         print('#measures_neutral: {}'.format(len(measures_neutral)))
         
-        #print(measures_left)
-        #print(measures_right)
-        
         ## Significance tests
-        print(mannwhitneyu(measures_left, measures_right, alternative='two-sided'))
-        print(kruskal(measures_left, measures_right, measures_neutral))
-        print(ks_2samp(measures_left, measures_right))
+        self.util.applySignificanceTest(measures_left, measures_right)
         
         measures_left = np.array(measures_left, dtype='float64')
         measures_right = np.array(measures_right, dtype='float64')
@@ -1739,113 +1507,14 @@ class Tweet:
                                       ["Left", "Right","Neutral"], measure_type, None, True)
     
     
-    ## 
-    def getNetworkGeographicalMeasuresByVideoId(self, tweets, video_id, user_locs):
-        related_tweets = self.getTweetsByVideoId(tweets, video_id)
-        
-        video_tweets_info = []
-        for tid in related_tweets:
-            tweet_id = tweets[tid]['_source']['tweet_id_str']
-            user_id = tweets[tid]['_source']['user_id_str']
-            timestamp_ms = int(tweets[tid]['_source']['timestamp_ms'])
-            video_tweets_info.append((user_id, tweet_id, timestamp_ms))
-        
-        video_tweets_info_sorted = sorted(video_tweets_info, key=lambda tup: tup[2])        
-        
-        user_ids = []
-        for tup in video_tweets_info_sorted:
-            if tup[0] not in user_ids:
-                user_ids.append(tup[0])
-        
-        states = location.getStates()
-        nw_locs = {}
-        for uid in user_ids:
-            if uid in user_locs:
-                loc = user_locs[uid]
-                if loc in states:
-                    if loc not in nw_locs:
-                        nw_locs[loc] = 1
-                    else:
-                        nw_locs[loc] += 1
-        
-        for loc in states:
-            if loc not in nw_locs:
-                nw_locs[loc] = 0
-        
-        #print(nw_locs)
-        num_users_with_loc = sum(list(nw_locs.values()))
-        for loc in nw_locs:
-            if num_users_with_loc > 0:
-                nw_locs[loc] = float(nw_locs[loc]) / num_users_with_loc
-        
-        #print(nw_locs)
-        
-        return nw_locs
-    
-    ## Calcuate geographical measures for all filtered videos.
-    def getAllNetworkGeographicalMeasures(self, tweets):
-        user_locs = pickle.load(open(self.ea_users_locs_path, 'rb'))
-        
-        geo_measures = {}
-        if os.path.isfile(self.video_tweet_geo_measures_path):
-            geo_measures = pickle.load(open(self.video_tweet_geo_measures_path, 'rb'))
-        else:
-            video_ids = self.getFilteredVideoIds()
-            cnt = 0
-            for vid in video_ids:
-                print('Geographical measures calculating for {} ... | cnt: {}'.format(vid, cnt))
-                nw_locs = self.getNetworkGeographicalMeasuresByVideoId(tweets, vid, user_locs)
-                geo_measures[vid] = {"nw_locs": nw_locs}
-                #print("Geographical measures calcualted for {} !".format(vid))
-                cnt+=1
-            
-            pickle.dump(geo_measures, open(self.video_tweet_geo_measures_path, 'wb'))
-            print("Geographical measures saved !! {}".format(self.video_tweet_geo_measures_path))
-        
-        return geo_measures
-    
-    ## Analyze geographocal measures
-    def analyzeGeographicalMeasures(self, measure_type, video_leanings_probs):
-        geo_measures = pickle.load(open(self.video_tweet_geo_measures_path, 'rb'))
-        video_ids = list(video_leanings_probs.keys())
-        
-        measures_left = [geo_measures[vid][measure_type] for vid in video_leanings_probs if video_leanings_probs[vid]['right'] < self.predefined_video_leaning_thr['left']]
-        measures_right = [geo_measures[vid][measure_type] for vid in video_leanings_probs if video_leanings_probs[vid]['right'] > self.predefined_video_leaning_thr['right']]
-        measures_neutral = [geo_measures[vid][measure_type] for vid in video_leanings_probs if video_leanings_probs[vid]['right'] >= self.predefined_video_leaning_thr['left'] and video_leanings_probs[vid]['right'] <= self.predefined_video_leaning_thr['right']]
-        print('#measures_left: {}'.format(len(measures_left)))
-        print('#measures_right: {}'.format(len(measures_right)))
-        print('#measures_neutral: {}'.format(len(measures_neutral)))
-        
-        left_locs = {}
-        right_locs = {}
-        neutral_locs = {}
-        for loc in location.getStates():
-            #print(measures_left)
-            left_locs[loc] = float(sum([vid[loc] for vid in measures_left])) / len(measures_left)
-            right_locs[loc] = float(sum([vid[loc] for vid in measures_right])) / len(measures_right)
-            neutral_locs[loc] = float(sum([vid[loc] for vid in measures_neutral])) / len(measures_neutral)
-        
-        sorted_left_locs = sorted(left_locs.items(), key=itemgetter(1), reverse=True)
-        sorted_right_locs = sorted(right_locs.items(), key=itemgetter(1), reverse=True)
-        sorted_neutral_locs = sorted(neutral_locs.items(), key=itemgetter(1), reverse=True)
-        
-        print("Left mean participation --- ")
-        print(sorted_left_locs)
-        print("Right mean participation --- ")
-        print(sorted_right_locs)
-        print("Neutral mean participation --- ")
-        print(sorted_neutral_locs)
-        
-        return sorted_left_locs, sorted_right_locs, sorted_neutral_locs
-    
-    
+    ## LANGUAGE MEASURES  ########################################################################################
     ## Calcuate Language measures for all filtered videos.
     def getAllLanguageMeasures(self, tweets):
         language_liwc_measures = {}
         language_empath_measures = {}
-        if os.path.isfile(self.video_tweet_language_liwc_measures_path):
-            language_liwc_measures = pickle.load(open(self.video_tweet_language_liwc_measures_path, 'rb'))
-            language_empath_measures = pickle.load(open(self.video_tweet_language_empath_measures_path, 'rb'))
+        if os.path.isfile(self.ea_language_liwc_measures_path):
+            language_liwc_measures = pickle.load(open(self.ea_language_liwc_measures_path, 'rb'))
+            language_empath_measures = pickle.load(open(self.ea_language_empath_measures_path, 'rb'))
         else:
             filtered_video_ids = self.getFilteredVideoIds()
             parser = EkphrasisParser()
@@ -1938,17 +1607,17 @@ class Tweet:
                 counter+=1
                 print('cnt: {}'.format(counter), end='\r')
 
-            pickle.dump(language_liwc_measures, open(self.video_tweet_language_liwc_measures_path, 'wb'))
-            pickle.dump(language_empath_measures, open(self.video_tweet_language_empath_measures_path, 'wb'))
+            pickle.dump(language_liwc_measures, open(self.ea_language_liwc_measures_path, 'wb'))
+            pickle.dump(language_empath_measures, open(self.ea_language_empath_measures_path, 'wb'))
         
         return language_liwc_measures, language_empath_measures
     
     def analyzeLanguageMeasures(self, dict_type, measure_type, video_leanings_probs):
         language_measures = {}
         if dict_type == 'liwc':
-            language_measures = pickle.load(open(self.video_tweet_language_liwc_measures_path, 'rb'))
+            language_measures = pickle.load(open(self.ea_language_liwc_measures_path, 'rb'))
         elif dict_type == 'empath':
-            language_measures = pickle.load(open(self.video_tweet_language_empath_measures_path, 'rb'))
+            language_measures = pickle.load(open(self.ea_language_empath_measures_path, 'rb'))
         vids = self.separateVideosByLeaning(video_leanings_probs)
         
         for vid in language_measures:
@@ -1959,12 +1628,6 @@ class Tweet:
                 num_tweets_with_measure = len(language_measures[vid][measure_type])
             language_measures[vid][measure_type] = float(num_tweets_with_measure) / language_measures[vid]['tc']
         
-        '''
-        measures_left = [language_measures[vid][measure_type] for vid in video_leanings_probs if video_leanings_probs[vid]['right'] < self.predefined_video_leaning_thr['left']]
-        measures_right = [language_measures[vid][measure_type] for vid in video_leanings_probs if video_leanings_probs[vid]['right'] > self.predefined_video_leaning_thr['right']]
-        measures_neutral = [language_measures[vid][measure_type] for vid in video_leanings_probs if video_leanings_probs[vid]['right'] >= self.predefined_video_leaning_thr['left'] and video_leanings_probs[vid]['right'] <= self.predefined_video_leaning_thr['right']]
-        '''
-        
         measures_left = [language_measures[vid][measure_type] for vid in vids['L']]
         measures_right = [language_measures[vid][measure_type] for vid in vids['R']]
         measures_neutral = [language_measures[vid][measure_type] for vid in vids['N']]
@@ -1973,21 +1636,9 @@ class Tweet:
         print('#measures_right: {}'.format(len(measures_right)))
         print('#measures_neutral: {}'.format(len(measures_neutral)))
         
-        #print(measures_left)
-        #print(measures_right)
-        #print(measures_neutral)
-        
         ## Significance tests
         print('Significance Test')
-        '''
-        print('Left (less):', mannwhitneyu(measures_left, measures_right, alternative='less'))
-        print('Left (greater):', mannwhitneyu(measures_left, measures_right, alternative='greater'))
-        print('Left (two-sided):', mannwhitneyu(measures_left, measures_right, alternative='two-sided'))
-        print(kruskal(measures_left, measures_right, measures_neutral))
-        print(ks_2samp(measures_left, measures_right))
-        '''
         self.util.applySignificanceTest(measures_left, measures_right)
-        print(kruskal(measures_left, measures_right, measures_neutral))
         
         ## Draw CDF and KDE for mean_min_cascades, median_min_cascades and max_min_cascades for left vs. right
         self.util.plotCDFMultiple([measures_left, measures_right, measures_neutral], 
@@ -1999,24 +1650,20 @@ class Tweet:
     def analyzeTweetsByLanguageCategory(self, dict_type, measure_type, video_leanings_probs, tweets, leaning):
         language_measures = {}
         if dict_type == 'liwc':
-            language_measures = pickle.load(open(self.video_tweet_language_liwc_measures_path, 'rb'))
+            language_measures = pickle.load(open(self.ea_language_liwc_measures_path, 'rb'))
         elif dict_type == 'empath':
-            language_measures = pickle.load(open(self.video_tweet_language_empath_measures_path, 'rb'))
+            language_measures = pickle.load(open(self.ea_language_empath_measures_path, 'rb'))
         
         vids = self.separateVideosByLeaning(video_leanings_probs)
         
-        '''
-        left_vids = [vid for vid in video_leanings_probs if video_leanings_probs[vid]['right'] < self.predefined_video_leaning_thr['left']]
-        right_vids = [vid for vid in video_leanings_probs if video_leanings_probs[vid]['right'] > self.predefined_video_leaning_thr['right']]
-        '''
         measures_left = [language_measures[vid][measure_type] for vid in vids['L']]
         measures_right = [language_measures[vid][measure_type] for vid in vids['R']]
-        print('#measures_left: {}'.format(len(left_vids)))
-        print('#measures_right: {}'.format(len(right_vids)))        
+        print('#measures_left: {}'.format(len(measures_left)))
+        print('#measures_right: {}'.format(len(measures_right)))        
         
-        #vids = left_vids if leaning == 'left' else right_vids
+        all_vids = vids['L'] + vids['R'] + vids['N']
         
-        for vid in vids:
+        for vid in all_vids:
             print(vid)
             for tid in language_measures[vid][measure_type]:
                 retweeted_tweet_id_str = tweets[tid]['_source']['retweeted_tweet_id_str']
@@ -2038,68 +1685,6 @@ class Tweet:
             print('++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++')
     
     
-    def analyzeAssortativityLeaningRelation(self, tweets, video_id):
-        related_tweets = self.getTweetsByVideoId(tweets, video_id)
-        sub_followings_dict = pickle.load(open(self.ea_users_sub_followings_path, 'rb'))
-        users_leaning_scores = pickle.load(open(self.ea_users_inferred_leanings_scores_path, 'rb'))
-        
-        users_leaning_probs = {}
-        users_leaning_labels = {}
-        for uid in users_leaning_scores:
-            if (users_leaning_scores[uid]['left'] + users_leaning_scores[uid]['right']) != 0:
-                user_leaning_prob = users_leaning_scores[uid]['right'] / (users_leaning_scores[uid]['left'] + users_leaning_scores[uid]['right'])
-                users_leaning_probs[uid] = user_leaning_prob
-                users_leaning_labels[uid] = 'R' if user_leaning_prob > 0.5 else 'L' 
-        
-        video_tweets_info = []
-        for tid in related_tweets:
-            tweet_id = tweets[tid]['_source']['tweet_id_str']
-            user_id = tweets[tid]['_source']['user_id_str']
-            timestamp_ms = int(tweets[tid]['_source']['timestamp_ms'])
-            video_tweets_info.append((user_id, tweet_id, timestamp_ms))
-        
-        video_tweets_info_sorted = sorted(video_tweets_info, key=lambda tup: tup[2])        
-        
-        user_ids = []
-        for tup in video_tweets_info_sorted:
-            if tup[0] not in user_ids:
-                user_ids.append(tup[0])
-        
-        nw_attributes = {}
-        for uid in user_ids:
-            if uid in users_leaning_probs:
-                nw_attributes[uid] = {}
-                nw_attributes[uid]['leaning_probs'] = users_leaning_probs[uid]
-                nw_attributes[uid]['leaning_labels'] = users_leaning_labels[uid]
-        
-        ## create follower-followee graph and set attributes
-        G = nx.DiGraph()
-        G.add_nodes_from(user_ids)
-        print('len(G): {}'.format(len(G)))
-        for uid in user_ids:
-            for uid_2 in sub_followings_dict[uid]:
-                if uid_2 in user_ids:
-                    G.add_edge(uid, uid_2)
-        
-        nx.set_node_attributes(G, nw_attributes)
-        
-        uids = list(G.nodes)
-        for uid in uids:
-            print('{}: {} --- {}'.format(uid, users_leaning_probs[uid], users_leaning_labels[uid]))
-        
-        
-        users_to_be_removed = list(set(user_ids).difference(set(users_leaning_probs.keys())))
-        print('users_to_be_removed:', users_to_be_removed)
-        G.remove_nodes_from(users_to_be_removed)
-        #nw_assortativity_leaning_probs = nx.algorithms.assortativity.numeric_assortativity_coefficient(G, 'leaning_probs')
-        nw_assortativity_leaning_labels = nx.algorithms.assortativity.attribute_assortativity_coefficient(G, 'leaning_labels')
-        print(nw_assortativity_leaning_labels)
-        
-        edges = list(G.edges)
-        for pair in edges:
-            print('{} ({}) --> {} ({})'.format(pair[0], users_leaning_labels[pair[0]], pair[1], users_leaning_labels[pair[1]]))
-    
-    
     ###########################################################################
     ## Video-related operations ###############################################
     ###########################################################################
@@ -2107,7 +1692,8 @@ class Tweet:
     ## measure_type: [duration, avgWatch, dailyShare, dailyScubscriber, dailyTweet, dailyView, dailyWatch, totalShare,
     ##                totalSubscriber, totalTweet, totalView, commentCount, dislikeCount, favoriteCount, likeCount, viewCount]
     def analyzeVideosByProperty(self, video_leanings_probs, measure_type):
-        videos = pickle.load(open(self.all_videos_from_annotated_videos_path, 'rb'))
+        videos = pickle.load(open(self.videos_path, 'rb'))
+        vids = self.separateVideosByLeaning(video_leanings_probs)
         
         insights_types = ['avgWatch', 'totalShare', 'totalSubscriber', 'totalTweet', 'totalView', 'totalWatch']
         statistics_types = ['likeCount', 'dislikeCount', 'commentCount', 'favoriteCount', 'viewCount']
@@ -2133,26 +1719,17 @@ class Tweet:
             if measure != None:
                 video_data[vid] = measure
         
-        measures_left = []
-        measures_right = []
-        measures_neutral = []
-        
-        measures_left = [video_data[vid] for vid in video_leanings_probs if video_leanings_probs[vid]['right'] < self.predefined_video_leaning_thr['left'] and vid in video_data]
-        measures_right = [video_data[vid] for vid in video_leanings_probs if video_leanings_probs[vid]['right'] > self.predefined_video_leaning_thr['right'] and vid in video_data]
-        measures_neutral = [video_data[vid] for vid in video_leanings_probs if video_leanings_probs[vid]['right'] >= self.predefined_video_leaning_thr['left'] and video_leanings_probs[vid]['right'] <= self.predefined_video_leaning_thr['right'] and vid in video_data]
+        measures_left = [video_data[vid] for vid in vids['L'] if vid in video_data]
+        measures_right = [video_data[vid] for vid in vids['R'] if vid in video_data]
+        measures_neutral = [video_data[vid] for vid in vids['N'] if vid in video_data]
         
         print('#measures_left: {}'.format(len(measures_left)))
         print('#measures_right: {}'.format(len(measures_right)))
         print('#measures_neutral: {}'.format(len(measures_neutral)))
         
-        print(measures_left)
-        print(measures_right)
-        print(measures_neutral)
-        
         ## Significance test
         print('Significance Test')
         self.util.applySignificanceTest(measures_left, measures_right)
-        #print(kruskal(measures_left, measures_right, measures_neutral))
                 
         ## Draw CDF and KDE for mean_min_cascades, median_min_cascades and max_min_cascades for left vs. right
         ## is_log_chart: boolean
@@ -2170,7 +1747,8 @@ class Tweet:
     ## measure_type: [avgWatch/duration, totalShare/totalView
     ##                likeCount/viewCount, dislikeCount/viewCount, commentCount/viewCount]
     def analyzeVideosByNormalizedProperty(self, video_leanings_probs, measure_type):
-        videos = pickle.load(open(self.all_videos_from_annotated_videos_path, 'rb'))
+        videos = pickle.load(open(self.videos_path, 'rb'))
+        vids = self.separateVideosByLeaning(video_leanings_probs)
         
         insights_types = ['totalShare']
         statistics_types = ['likeCount', 'dislikeCount', 'commentCount', 'favoriteCount']
@@ -2195,17 +1773,13 @@ class Tweet:
             if measure != None:
                 video_data[vid] = measure
         
-        measures_left = [video_data[vid] for vid in video_leanings_probs if video_leanings_probs[vid]['right'] < self.predefined_video_leaning_thr['left'] and vid in video_data]
-        measures_right = [video_data[vid] for vid in video_leanings_probs if video_leanings_probs[vid]['right'] > self.predefined_video_leaning_thr['right'] and vid in video_data]
-        measures_neutral = [video_data[vid] for vid in video_leanings_probs if video_leanings_probs[vid]['right'] >= self.predefined_video_leaning_thr['left'] and video_leanings_probs[vid]['right'] <= self.predefined_video_leaning_thr['right'] and vid in video_data]
+        measures_left = [video_data[vid] for vid in vids['L'] if vid in video_data]
+        measures_right = [video_data[vid] for vid in vids['R'] if vid in video_data]
+        measures_neutral = [video_data[vid] for vid in vids['N'] if vid in video_data]
         
         print('#measures_left: {}'.format(len(measures_left)))
         print('#measures_right: {}'.format(len(measures_right)))
         print('#measures_neutral: {}'.format(len(measures_neutral)))
-        
-        print(measures_left)
-        print(measures_right)
-        print(measures_neutral)
         
         ## Significance test
         print('Significance Test')
@@ -2223,7 +1797,7 @@ class Tweet:
     ## measure_type: [avgWatch/duration, totalShare/totalView
     ##                likeCount/viewCount, dislikeCount/viewCount, commentCount/viewCount]
     def analyzeDivisiveContentsByScatterPlots(self, video_leanings_probs):
-        videos = pickle.load(open(self.all_videos_from_annotated_videos_path, 'rb'))
+        videos = pickle.load(open(self.videos_path, 'rb'))
         vids = self.separateVideosByLeaning(video_leanings_probs)
         tweets = self.getAvailableTweets(0.2)
         video_first_share_time = {}
@@ -2268,16 +1842,6 @@ class Tweet:
             right_vids.append(vid)
         for vid in vids['N']:
             neutral_vids.append(vid)
-        
-        '''
-        for vid in video_leanings_probs:
-            if video_leanings_probs[vid]['right'] < self.predefined_video_leaning_thr['left']:
-                left_vids.append(vid)
-            elif video_leanings_probs[vid]['right'] > self.predefined_video_leaning_thr['right']:
-                right_vids.append(vid)
-            elif video_leanings_probs[vid]['right'] >= self.predefined_video_leaning_thr['left'] and video_leanings_probs[vid]['right'] <= self.predefined_video_leaning_thr['right']:
-                neutral_vids.append(vid)
-        '''
         
         all_vids = left_vids + right_vids + neutral_vids
         colors_all = ['blue'] * len(left_vids) + ['red'] * len(right_vids) + ['orange'] * len(neutral_vids)
@@ -2330,7 +1894,6 @@ class Tweet:
         print('Significance popularity')
         self.util.applySignificanceTest(popularity_left, popularity_right)
         
-        
         ## Correlation
         dataset_left = pd.DataFrame({'Polarity': polarity_left, 'Intensity': intensity_left, 
                                      'Divisiveness': divisiveness_left, 'Popularity': popularity_left})
@@ -2341,6 +1904,7 @@ class Tweet:
         print('Correlation Right')
         self.util.calculateCorrelation(dataset_right, method='spearman')
         
+        '''
         ## Partial Correlation
         dataset_left = pd.DataFrame({'Polarity': polarity_left, 'Intensity': intensity_left, 
                                      'Divisiveness': divisiveness_left, 'Popularity': popularity_left})
@@ -2354,7 +1918,7 @@ class Tweet:
         self.util.partial_corr(dataset_right, method='spearman')
         print('Partial Correlation All')
         self.util.partial_corr(dataset_all, method='spearman')
-        
+        '''
         
         ## Draw Intensity-Polarity-Divisiveness
         self.util.plotScatter(polarity_left, intensity_left, None, "Polarity", "Intensity", None, False,
@@ -2421,7 +1985,7 @@ class Tweet:
         users = pickle.load(open(self.users_path, 'rb'))
         users_locs = pickle.load(open(self.ea_users_locs_path, 'rb'))
         tweets = pickle.load(open(self.ea_tweets_path, 'rb'))
-        user_comm_pairs = pickle.load(open(self.users_communities_path, 'rb'))
+        user_comm_pairs = pickle.load(open(self.ea_communities_path, 'rb'))
         
         connection_list = pickle.load(open(self.ea_users_followers_path, 'rb'))
         
@@ -2534,7 +2098,7 @@ class Tweet:
         users = pickle.load(open(self.users_path, 'rb'))
         users_locs = pickle.load(open(self.ea_users_locs_path, 'rb'))
         #tweets = pickle.load(open(self.tweets_path, 'rb'))
-        user_comm_pairs = pickle.load(open(self.users_communities_path, 'rb'))
+        user_comm_pairs = pickle.load(open(self.ea_communities_path, 'rb'))
         
         communities = list(set(list(user_comm_pairs['assigned_com_memberships'].values())))
         num_communities = len(communities)
@@ -2575,7 +2139,7 @@ class Tweet:
     
     ## Return the most shared videos for each community.
     def getMostSharedVideosByCommunities(self, tweets):
-        user_comm_pairs = pickle.load(open(self.users_communities_path, 'rb'))
+        user_comm_pairs = pickle.load(open(self.ea_communities_path, 'rb'))
         
         communities = list(set(list(user_comm_pairs['assigned_com_memberships'].values())))
         num_communities = len(communities)
@@ -2603,7 +2167,7 @@ class Tweet:
     
     ## check #users from each political leaning in the communities.
     def checkLeaningsInCommunities(self):
-        user_comm_pairs = pickle.load(open(self.users_communities_path, 'rb'))
+        user_comm_pairs = pickle.load(open(self.ea_communities_path, 'rb'))
         users_leanings_labels = pickle.load(open(self.ea_users_leanings_labels_path, 'rb'))
         users_inferred_leanings_scores = pickle.load(open(self.ea_users_inferred_leanings_scores_path, 'rb'))
         
@@ -2640,7 +2204,7 @@ class Tweet:
     
     ## Return the tweets posted by a super-community for a given video-id.
     def getTweetsOfCommunitiesByVideoId(self, tweets, video_id, super_com):
-        user_comm_pairs = pickle.load(open(self.users_communities_path, 'rb'))
+        user_comm_pairs = pickle.load(open(self.ea_communities_path, 'rb'))
         users = pickle.load(open(self.users_path, 'rb'))
         
         results = []
@@ -2648,7 +2212,6 @@ class Tweet:
         for tweet_id in tweets:
             user_id = tweets[tweet_id]['_source']['user_id_str']
             user_screen_name = users[user_id]['_source']['screen_name']
-            #if user_id in user_comm_pairs['assigned_com_memberships']:
             user_com = user_comm_pairs['assigned_com_memberships'][user_id]
             original_video_ids = tweets[tweet_id]['_source']['original_vids'].split(';')
             retweeted_video_ids = tweets[tweet_id]['_source']['retweeted_vids'].split(';')
@@ -2726,35 +2289,6 @@ class Tweet:
             else:
                 all_cascade_list[i]['min'] = min(min_cascades) + 1
                 all_cascade_list[i]['max'] = max(max_cascades) + 1
-        
-        
-        '''
-        all_cascade_list = []
-        for i in range(len(user_ids)):
-            if i % 10 == 0:
-                print("User {} is processed!".format(str(i)))
-            followers = np.where(user_follower_mat[i]==1)[0]
-            followers = followers[followers<i]
-            user_cascade_list = []
-            for fol_ind in followers:
-                #print('fol_ind:', fol_ind)
-                aa = copy.deepcopy(all_cascade_list)
-                fol_cascade = aa[fol_ind]
-                #print('fol_cascade:', fol_cascade)
-                for k in range(len(fol_cascade)):
-                    fol_cascade[k].append(i)
-                #print('user_cascade_list:', user_cascade_list)
-                for cas in fol_cascade:
-                    user_cascade_list.append(cas)
-                #print('user_cascade_list:', user_cascade_list)
-
-            if len(followers) == 0:
-                user_cascade_list.append([i])
-
-            all_cascade_list.append(user_cascade_list)
-            #print('all_cascade_list:', all_cascade_list)
-            #print('------------------------------------')
-        '''
             
         return user_ids, all_cascade_list
     
@@ -2767,7 +2301,7 @@ class Tweet:
     def checkConnectionChanges(self):
         users = pickle.load(open(self.users_path, 'rb'))
         connection_list = pickle.load(open(self.ea_users_followers_path, 'rb'))
-        user_comm_pairs = pickle.load(open(self.users_communities_path, 'rb'))
+        user_comm_pairs = pickle.load(open(self.ea_communities_path, 'rb'))
         communities = list(set(list(user_comm_pairs['assigned_com_memberships'].values())))
         
         total_num_diffs = []
