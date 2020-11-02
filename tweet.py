@@ -90,7 +90,6 @@ class Tweet:
         self.aggregated_dates = self.util.getAggregatedDates()
         self.active_videos_ids = 'data/from_anu/_active_videos.pkl'
         self.video_annotations_path = 'data/from_anu/v1/{}_video_annotations.csv'.format(self.util.campaign)
-        self.all_videos_from_annotated_videos_path = 'data/from_anu/v1/{}_all_videos_from_annotated_videos.pkl'.format(self.util.campaign)
         
     
     def getTweetVolumeDistribution(self, data):
