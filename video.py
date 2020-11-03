@@ -14,8 +14,15 @@ import os
 class Video:
     def __init__(self, util):
         self.util = util
-        self.videos_path = 'data/from_anu/' + self.util.campaign + '_videos' + '.pkl'
-        self.videos_from_tweets_path = 'data/from_anu/' + self.util.campaign + '_videos_from_tweets' + '.pkl'
+        
+        # Initial videos by keywords and all relevant videos.
+        self.initial_videos_path = 'data/social_media/{}/videos_by_keywords.pkl'.format(self.util.campaign)
+        self.videos_path = 'data/social_media/{}/all_videos_by_relevant_videos.pkl'.format(self.util.campaign)
+        
+        # From Siqi
+        self.view_120_path = 'data/social_media/{}/videos_view120.pkl'.format(self.util.campaign)
+        self.virality_path = 'data/social_media/{}/videos_label_exo_endo.csv'.format(self.util.campaign)
+        
         self.bin_size = self.util.bin_size
         self.daily_dates = self.util.daily_dates
         self.aggregated_dates = self.util.getAggregatedDates()
@@ -38,57 +45,6 @@ class Video:
         print('# of total videos:', np.sum(aggregated_counts))
         
         return aggregated_counts
-    
-    def getVideos(self):
-        exp_videos = pickle.load(open(self.videos_path, 'rb'))
-        videos_from_tweets = pickle.load(open(self.videos_from_tweets_path, 'rb'))
-        
-        exp_video_ids = exp_videos.keys()
-        video_from_tweets_ids = videos_from_tweets.keys()
-        print("exp_relevant_video_ids len:", len(exp_video_ids))
-        print("video_from_tweets_ids len:", len(video_from_tweets_ids))
-
-        ## analyze union of videos and videos_from_tweets
-        print("=====  Union: Explicitly Relevant videos + Videos from tweets   =====")
-        union_video_ids = list(set(exp_video_ids) | set(video_from_tweets_ids))
-        union_videos = {}
-        print("union_video_ids len:", len(union_video_ids))
-        
-        a = len(list(set(video_from_tweets_ids))) - len(list(set(video_from_tweets_ids).difference(set(exp_video_ids))))
-        print('a:', a)
-        
-        '''
-        for video_id in union_video_ids:
-            if video_id in exp_videos:
-                union_videos[video_id] = exp_videos[video_id].copy()
-            elif video_id in union_video_ids:
-                union_videos[video_id] = videos_from_tweets[video_id].copy()
-        '''
-        
-        ## analyze difference of videos_from_tweets from videos
-        print("=====  Implicitly Relevant videos  =====")
-        imp_video_ids = list(set(video_from_tweets_ids).difference(set(exp_video_ids)))
-        imp_videos = {}
-        print("imp_relevant_video_ids len:", len(imp_video_ids))
-
-        for video_id in imp_video_ids:
-            imp_videos[video_id] = videos_from_tweets[video_id].copy()
-        
-        '''
-        for video in exp_relevant_videos:
-            print(video)
-            publishedAt = video['_source']['snippet']['publishedAt']
-            insights_start_date = video['_source']['insights']['startDate']
-            daily_views = video['_source']['insights']['dailyView']
-            daily_watches = video['_source']['insights']['dailyWatch']
-            print("publishedAt: ", publishedAt)
-            print("insights_start_date: ", insights_start_date)
-            print("len daily_views: ", len(daily_views), "len daily_watches: ", len(daily_watches))
-            print("===================================================================================")
-            break
-        '''
-        
-        return exp_videos, imp_videos, union_videos, videos_from_tweets
     
     ## get total video watches
     def getTotalVideoWatches(self, videos):

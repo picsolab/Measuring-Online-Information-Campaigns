@@ -43,6 +43,10 @@ class Tweet:
         
         self.util = util
         
+        ## Initial tweets and videos retrieved by topical keywords
+        self.initial_tweets_path = 'data/social_media/{}/tweets_by_keywords.pkl'.format(self.util.campaign)
+        self.initial_videos_path = 'data/social_media/{}/videos_by_keywords.pkl'.format(self.util.campaign)
+        
         ## All relevant tweets, users, videos by relevant videos
         self.tweets_path = 'data/social_media/{}/all_tweets_by_relevant_videos.pkl'.format(self.util.campaign)
         self.users_path = 'data/social_media/{}/all_users_by_relevant_videos.pkl'.format(self.util.campaign)
@@ -66,6 +70,8 @@ class Tweet:
         self.ea_users_leanings_labels_path = 'data/social_media/{}/ea_users_leanings_labels.pkl'.format(self.util.campaign)
         self.ea_users_inferred_leanings_scores_path = 'data/social_media/{}/ea_users_inferred_leanings_scores.pkl'.format(self.util.campaign)
         
+        self.users_locs_path = 'data/social_media/{}/all_users_locs.pkl'.format(self.util.campaign)
+        
         ## Early adopters' communities path
         self.ea_communities_path = 'data/social_media/{}/ea_communities_{}_res_{}.pkl'.format(self.util.campaign,
                                                                                               str(self.util.year),
@@ -82,8 +88,6 @@ class Tweet:
         self.ea_language_empath_measures_path = "data/social_media/{}/ea_language_empath_measures.pkl".format(self.util.campaign)
         self.ea_cascade_measures_path = 'data/social_media/{}/ea_cascade_measures.pkl'.format(self.util.campaign)
         #self.ea_geo_measures_path = "data/social_media/{}/ea_geo_measures.pkl".format(self.util.campaign)
-        
-        
         
         self.bin_size = self.util.bin_size
         self.daily_dates = self.util.daily_dates
