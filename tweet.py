@@ -26,7 +26,7 @@ from empath import Empath
 from src.language.text_parser import EkphrasisParser
 from src.language import liwc
 
-mapping = {
+thresholds = {
     "abo": {"left": 0.53784, "right": 0.74940},
     "gun": {"left": 0.47838, "right": 0.71606}, 
     "blm": {"left": 0.52373, "right": 0.69474}
@@ -78,7 +78,7 @@ class Tweet:
                                                                                               community_resolution_param[self.util.campaign])
         
         ## Video leaning thresholds
-        self.predefined_video_leaning_thr = mapping[self.util.campaign]
+        self.predefined_video_leaning_thr = thresholds[self.util.campaign]
         
         ## Video leaning thresholds
         self.ea_network_structural_measures_path = "data/social_media/{}/ea_network_structural_measures.pkl".format(self.util.campaign)
