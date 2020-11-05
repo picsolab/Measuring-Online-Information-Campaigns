@@ -67,7 +67,7 @@ class Tweet:
         self.right_seed_political_hashtags_path = 'data/leaning_keywords/right_political.txt'
         self.left_extended_political_hashtags_path = 'data/social_media/{}/left_political_hashtags_extended.txt'.format(self.util.campaign)
         self.right_extended_political_hashtags_path = 'data/social_media/{}/right_political_hashtags_extended.txt'.format(self.util.campaign)
-        self.ea_users_leanings_labels_path = 'data/social_media/{}/ea_users_leanings_labels.pkl'.format(self.util.campaign)
+        self.ea_seed_users_leanings_labels_path = 'data/social_media/{}/ea_seed_users_leanings_labels.pkl'.format(self.util.campaign)
         self.ea_users_inferred_leanings_scores_path = 'data/social_media/{}/ea_users_inferred_leanings_scores.pkl'.format(self.util.campaign)
         
         self.users_locs_path = 'data/social_media/{}/all_users_locs.pkl'.format(self.util.campaign)
@@ -625,7 +625,7 @@ class Tweet:
 
                 user_leanings[user_id] = leaning
         
-        pickle.dump(user_leanings, open(self.ea_users_leanings_labels_path, 'wb'))
+        pickle.dump(user_leanings, open(self.ea_seed_users_leanings_labels_path, 'wb'))
         return user_leanings
    
     
@@ -2170,7 +2170,7 @@ class Tweet:
     ## check #users from each political leaning in the communities.
     def checkLeaningsInCommunities(self):
         user_comm_pairs = pickle.load(open(self.ea_communities_path, 'rb'))
-        users_leanings_labels = pickle.load(open(self.ea_users_leanings_labels_path, 'rb'))
+        users_leanings_labels = pickle.load(open(self.ea_seed_users_leanings_labels_path, 'rb'))
         users_inferred_leanings_scores = pickle.load(open(self.ea_users_inferred_leanings_scores_path, 'rb'))
         
         communities = list(set(list(user_comm_pairs['assigned_com_memberships'].values())))
