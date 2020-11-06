@@ -1,3 +1,6 @@
+## pipeline.pdf
+Shows the pipline step by step including (1) how to extract topic relevant tweets and videos, (2) how to find early adopters and their shared audience network, (3) how to apply political leaning propagation, (4) how to find political leaning thresholds for videos, (5) how to extract and analyze the engagement, network structural, temporal, language, cascade and YouTube reaction information for YouTube videos using early adopters in Twitter.
+
 # Folders
 
 ## elasticsearch
@@ -25,17 +28,28 @@ Methods to assign location to a given tweet or user profile.
 Methods for calculating several graph metrics.
 
 ## analyze.ipynb
-To find early adopters and analyze their engagment, network structure, temporal, language, cascade and YouTube reaction information as well as their profile information.
+To find early adopters and improve their profile information, find and analyze engagment, network structural, temporal, language, cascade and YouTube reaction of YouTube videos.
 
 ## additional_analysis.ipynb
 Some additional analysis including cross-cutting exposure and sanity check for political leaning assignment.
 
 ## disparity_filtering.ipynb
-To perform disparity filtering on early adopter's follower network to find the backbone of the network.
+To perform disparity filtering on early adopter's shared audience network to find its backbone.
 
 ## community_detection.ipynb
-To find communities in follower network of early adopters.
+To find communities in shared audience network of early adopters (after disparity filtering).
 
 ## find_video_leaning_thresholds.ipynb
 To calculate thr<sub>(L, C)</sub> and thr<sub>(C, R)</sub> based on the external source Recfluence.
 
+## political_leaning_propagation.ipynb
+To perform political leaning propagation on early adopters' shared audience network (after disparity filtering) to find political leaning scores of unknown users using the seed users' political leanings.
+
+## prepare_online_offline_analysis_data.ipynb
+To prepare online (video properties by leaning including leaning, engagement, network structural, temproal, language, cascade, and YouTube reaction measures and virality) and offline data relevant to topics for analysis.
+
+## visualize_retweet_graph.ipynb
+To visualize the retweets between the communities in shared audience network of early adopters obtained as a result of community detection.
+
+## z_CSCW.ipynb
+Methods to compare the measures of different topics as well as additional analysis for our submitted CSCW 2021 paper.
