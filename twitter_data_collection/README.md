@@ -7,7 +7,9 @@ Partition the user_ids before collection of their followers/friends in parallel 
 Run "collect_user_followers_friends.py" for each chunk to perform parallel collection as follows:
 
 `nohup python3 collect_user_followers_friends.py --campaign gun --type followers --chunk_no 0 &`
+
 `nohup python3 collect_user_followers_friends.py --campaign gun --type followers --chunk_no 1 &`
+
 `nohup python3 collect_user_followers_friends.py --campaign gun --type followers --chunk_no 2 &`
 
 ## create graph edges 
