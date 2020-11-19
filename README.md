@@ -4,7 +4,7 @@ Shows the pipline step by step including (1) how to extract topic relevant tweet
 # Folders
 
 ## src
-Scripts and LIWC tool for text analysis. Since LIWC is licensed, this folder is only for internal use. Please **do not make this folder public.**
+Scripts and LIWC tool for text analysis. Since LIWC is licensed, this folder is only for internal use. **Please do not make this folder public.**
 
 ## elasticsearch
 Scripts to retrieve data from ANU servers.
