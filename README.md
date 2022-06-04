@@ -1,58 +1,59 @@
-## pipeline.pdf
-Shows the pipline step by step including (1) how to extract topic relevant tweets and videos, (2) how to find early adopters and their shared audience network, (3) how to apply political leaning propagation, (4) how to find political leaning thresholds for videos, (5) how to extract and analyze the engagement, network structural, temporal, language, cascade and YouTube reaction information for YouTube videos using early adopters in Twitter.
+# Evidence of Political Ideological Asymmetries from a Cross-Platform, Cross-Topic, Longitudinal Study
 
-# Folders
+We release the code and data for the following paper.
+If you use this dataset, or refer to its results, please cite:
+> JooYoung Lee, Siqi Wu, Ali Mert Ertugrul, Yu-Ru Lin, and Lexing Xie. Whose Advantage? Measuring Attention Dynamics across YouTube and Twitter on Controversial Topics. *AAAI International Conference on Weblogs and Social Media (ICWSM)*, 2022. \[[paper](https://avalanchesiqi.github.io/files/icwsm2022xplatform.pdf)\]
 
-## src
-Scripts and LIWC tool for text analysis. Since LIWC is licensed, this folder is only for internal use. **Please do not make this folder public.**
+## Data
+We release tweeted video datasets for three controversial topics: Abortion (179 videos), Gun Control (268 videos), and BLM (777 videos).
 
-## elasticsearch
-Scripts to retrieve data from ANU servers.
+### abo_videos.json
+Each line contains cleaned video-level stats data for a YouTube video.
 
-## twitter_data_collection
-Scripts to perform data gathering from Twitter including checking users' existence, collecting users' followers-friends and creating the shared audience graph for the users.
+```json
+{"video_id": "XUDtoDAGVE8",
+ "title": "'Women's March' Crashed By Crowder... IN DRAG! (Featuring Wendy Davis)",
+ "channel_title": "StevenCrowder",
+ "channel_id": "UCIveFvW-ARp_B_RckhweNJw",
+ "duration": 520,
+ "political_label": "R",
+ "start_date": "2017-01-24",
+ "total_view120": 1795819,
+ "daily_view120": [355460, 183161, 57041, 37288, 27380, 22026, 21257, ...],
+ "avg_watch": 0.4946784519113252,
+ "relative_engagement": 0.76,
+ "num_like": 47324,
+ "num_dislike": 831,
+ "frac_like": 0.9827432250025958,
+ "est_source": "GT",
+ "est_prob": "0.8959362699353703",
+ "total_tweet120": 6018,
+ "daily_tweet120": [4106, 955, 149, 124, 72, 54, 19, ...],
+ "exo": 86.76663468715331,
+ "endo": 1.3272173220490222,
+ "virality": 115.15818053268941
+}
+```
 
-
-# Notebooks and Python scripts
-
-## tweet.py
-Methods to extract information about early adopters' of a topic in terms of engagment, network structure, temporal, language, cascade and YouTube reaction. It also includes methods to extract information about user profiles including location and seed political leanings. 
-
-## video.py
-Methods to extract information about YouTube videos.
-
-## utils.py
-Methods for visualizaion and some scientific calculation.
-
-## location.py
-Methods to assign location to a given tweet or user profile.
-
-## graph_ops.py
-Methods for calculating several graph metrics.
-
-## analyze.ipynb
-To find early adopters and improve their profile information, find and analyze engagment, network structural, temporal, language, cascade and YouTube reaction of YouTube videos.
-
-## additional_analysis.ipynb
-Some additional analysis including cross-cutting exposure and sanity check for political leaning assignment.
-
-## disparity_filtering.ipynb
-To perform disparity filtering on early adopter's shared audience network to find its backbone.
-
-## community_detection.ipynb
-To find communities in shared audience network of early adopters (after disparity filtering).
-
-## find_video_leaning_thresholds.ipynb
-To calculate thr<sub>(L, C)</sub> and thr<sub>(C, R)</sub> based on the external source Recfluence.
-
-## political_leaning_propagation.ipynb
-To perform political leaning propagation on early adopters' shared audience network (after disparity filtering) to find political leaning scores of unknown users using the seed users' political leanings.
-
-## prepare_online_offline_analysis_data.ipynb
-To prepare online (video properties by leaning including leaning, engagement, network structural, temproal, language, cascade, and YouTube reaction measures and virality) and offline data relevant to topics for analysis.
-
-## visualize_retweet_graph.ipynb
-To visualize the retweets between the communities in shared audience network of early adopters obtained as a result of community detection.
-
-## z_CSCW.ipynb
-Methods to compare the measures of different topics as well as additional analysis for our submitted CSCW 2021 paper.
+### Data Attribute Explanation
+* video_id: video identifier on YouTube
+* title: video title
+* channel_title: title of YouTube channel
+* channel_id: channel identifier on YouTube
+* duration: video length in seconds
+* political_label: ground-truth or predicted political leaning for this video
+* start_date: the first day when the video was published
+* total_view120: total view count in the first 120 days since the video's upload
+* daily_view120: daily time series of view count in the first 120 days since the video's upload
+* avg_watch: the average percentage all audience spend on this video
+* relative_engagement: the percentile ranking of average watch percentage among videos of similar lengths
+* num_like: the number of thumb-ups
+* num_dislike: the number of thumb-downs (not visible on YouTube any more)
+* frac_like: num_like / (num_like + num_dislike)
+* est_source: the political leaning of this video is obtained from an external, expert-labeled dataset (i.e., "GT"") or classified by the label propagation algorithm (i.e., "inferred"")
+* est_prob: the normalized score from label propagation
+* total_tweet120: total tweet count in the first 120 days since the video's upload
+* daily_tweet120: daily time series of tweet count in the first 120 days since the video's upload
+* exo: exogenous promotion score. The number of views that one unit of promotion (i.e., a tweet) will lead to.
+* endo: endogenous response score. The number of views that one unit of views (i.e., a view) will unfold.
+* virality: virality score, defined as exo * endo. This metric quantifies the total return from one tweet.
